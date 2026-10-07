@@ -162,7 +162,7 @@ footer{color:var(--muted);font-size:.78rem}
 .st{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;white-space:nowrap}
 .st::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
 .st.crit{color:var(--crit)} .st.warn{color:var(--warn)} .st.ok{color:var(--ok)} .st.none{color:var(--muted)} .st.info{color:var(--fg2)}
-.bar{width:120px;height:8px;border-radius:4px;background:var(--grid);overflow:hidden;display:inline-block;vertical-align:middle}
+.bar{width:90px;height:8px;border-radius:4px;background:var(--grid);overflow:hidden;display:inline-block;vertical-align:middle}
 .bar b{display:block;height:100%;border-radius:4px}
 .bar.crit b{background:var(--crit)} .bar.warn b{background:var(--warn)} .bar.ok b{background:var(--ok)}
 td.item{white-space:normal;min-width:10rem}
@@ -803,14 +803,14 @@ td.big{font-weight:600}
         return '<tr><td class="item"><b>'+esc(o.item)+'</b>'+obs+note+'</td><td><span class="tag">'+esc(o.tipo)+'</span></td>'+
           '<td class="num">'+(o.done ? fmtDate(o.done) : '—')+'</td>'+
           '<td class="r">'+(o.every ? fmtH(o.every)+' h' : '—')+'</td>'+
-          '<td class="r">'+(o.since != null ? fmtH(o.since)+' h'+(o.ded ? '<br><span class="sub">'+fmtH(o.real)+' h reales − '+String(o.ded).replace(".", ",")+' × '+o.nfl+(o.nfl === 1 ? ' vuelo' : ' vuelos')+'</span>' : '') : '—')+'</td>'+
-          '<td class="r big">'+rest+'</td><td>'+bar+'</td><td class="sub">'+eta+'</td>'+
+          '<td class="r">'+(o.since != null ? fmtH(o.since)+' h'+(o.ded ? '<br><span class="sub">'+fmtH(o.real)+' h reales − '+o.nfl+' × '+String(o.ded).replace(".", ",")+'</span>' : '') : '—')+'</td>'+
+          '<td class="r big">'+rest+'</td><td>'+bar+'</td>'+
           '<td class="num">'+venc+'</td>'+
           '<td><span class="st '+o.st+'">'+ST_TXT[o.st]+'</span></td></tr>';
       }).join("");
       var lastF = (state.rows || []).filter(function(r){ return r.ac === a; }).pop();
       return '<section class="panel acpanel" style="--c:'+acColor(a)+'"><div class="phead"><h2>'+esc(a)+'<span class="sub">'+(lastF ? 'último vuelo '+fmtDate(lastF.date) : '')+'</span></h2><span class="st '+worst+'">'+ST_TXT[worst]+'</span></div>'+
-        '<div class="tbl"><table><thead><tr><th>Ítem</th><th>Tipo</th><th>Realizado</th><th class="r">Cada</th><th class="r">Computadas desde</th><th class="r">Restan</th><th>Uso</th><th>Al ritmo actual</th><th>Vence</th><th>Estado</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div></section>';
+        '<div class="tbl"><table><thead><tr><th>Ítem</th><th>Tipo</th><th>Realizado</th><th class="r">Cada</th><th class="r">Computadas desde</th><th class="r">Restan</th><th>Uso</th><th>Vence</th><th>Estado</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div></section>';
     }).join("");
   }
 
