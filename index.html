@@ -722,7 +722,7 @@ td.big{font-weight:600}
     var today = new Date(); today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     var rateFrom = new Date(today.getTime() - 60*864e5), rate = {};
     (state.rows || []).forEach(function(r){ if (r.date >= rateFrom) rate[r.ac] = (rate[r.ac]||0) + r.hours/60; });
-    return (state.mant || []).map(function(m){
+    return (state.mant || []).map(function(m, idx){
       var ac = clean(m[0]).toUpperCase(), tipo = clean(m[1]), item = clean(m[2]);
       if (!ac && !item) return null;
       var done = parseDate(m[3]), every = parseHours(m[4]), due = parseDate(m[5]), obs = clean(m[6]);
@@ -757,6 +757,7 @@ td.big{font-weight:600}
         else if (/venc|p[oó]liza|seguro|anual/.test(t + " " + item.toLowerCase())){ sts.push("none"); o.notes.push("Falta cargar la fecha de vencimiento"); }
         else { sts.push("none"); o.notes.push(done ? "Falta cargar cada cuántas horas" : "Falta cargar fecha y horas"); }
       }
+      o.i = idx;
       o.st = sts.sort(function(a,b){ return ST_RANK[a] - ST_RANK[b]; })[0];
       return o;
     }).filter(Boolean);
@@ -783,11 +784,10 @@ td.big{font-weight:600}
     var order = AC_ORDER.filter(function(a){ return byAc[a]; });
     Object.keys(byAc).sort().forEach(function(a){ if (order.indexOf(a) < 0) order.push(a); });
     $("mgrid").innerHTML = order.map(function(a){
-      // Orden: Inspección → Componente → Reparación → Vencimiento; dentro de cada tipo, lo más urgente primero.
+      // Orden solo por tipo: Inspección → Componente → Reparación → Vencimiento; dentro de cada tipo, el orden de la planilla.
       function tRank(o){ var t = o.tipo.toLowerCase(); return /inspec/.test(t) ? 0 : /compon/.test(t) ? 1 : /repar/.test(t) ? 2 : /venc/.test(t) ? 3 : 4; }
-      function urg(o){ return o.left != null ? o.left : o.days != null ? o.days : 1e9; }
       var list = byAc[a].slice().sort(function(x,y){
-        return (tRank(x) - tRank(y)) || (ST_RANK[x.st] - ST_RANK[y.st]) || (urg(x) - urg(y));
+        return (tRank(x) - tRank(y)) || (x.i - y.i);
       });
       var worst = list.reduce(function(w, o){ return ST_RANK[o.st] < ST_RANK[w] ? o.st : w; }, list[0].st);
       var rowsHtml = list.map(function(o){
