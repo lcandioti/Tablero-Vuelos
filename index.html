@@ -15,6 +15,7 @@
   --brand:#c41230; --brand-ink:#ffffff; --brand-soft:#f7e3e6;
   --s1:#c41230; --s2:#8f8c85; --s3:#f2a7b2; --s4:#2e2d2b; --s5:#c9c6be;
   --up:#006300; --down:#b3261e;
+  --ok:#0a8a0a; --warn:#c27c00; --crit:#d03b3b;
   --f-display:"Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
   --f-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -26,7 +27,7 @@
     --grid:#2c2c2a; --axis:#3d3d3a; --line:rgba(255,255,255,.10);
     --brand:#e0425b; --brand-ink:#ffffff; --brand-soft:#3a1a20;
     --s1:#e0425b; --s2:#9a978f; --s3:#f7bcc5; --s4:#615f5a; --s5:#45433f;
-    --up:#3fbf3f; --down:#ff8a80; color-scheme:dark;
+    --up:#3fbf3f; --down:#ff8a80; --ok:#3fbf3f; --warn:#f0b43c; --crit:#ff6b62; color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
@@ -34,7 +35,7 @@
   --grid:#2c2c2a; --axis:#3d3d3a; --line:rgba(255,255,255,.10);
   --brand:#e0425b; --brand-ink:#ffffff; --brand-soft:#3a1a20;
   --s1:#e0425b; --s2:#9a978f; --s3:#f7bcc5; --s4:#615f5a; --s5:#45433f;
-  --up:#3fbf3f; --down:#ff8a80; color-scheme:dark;
+  --up:#3fbf3f; --down:#ff8a80; --ok:#3fbf3f; --warn:#f0b43c; --crit:#ff6b62; color-scheme:dark;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.5;padding:0 16px;}
@@ -49,7 +50,6 @@ button,select{font:inherit;color:inherit}
 /* Cabecera */
 header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:3px solid var(--brand);padding-bottom:12px}
 .mark{display:flex;align-items:center;gap:12px}
-.tail{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--brand-ink);background:var(--brand);padding:3px 8px;border-radius:3px;white-space:nowrap}
 .sub{color:var(--fg2);font-size:.85rem}
 .status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.8rem;color:var(--fg2)}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;margin-right:6px;vertical-align:middle}
@@ -126,6 +126,48 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 .tip .t{font-family:var(--f-mono);font-size:.72rem;opacity:.8;margin-bottom:2px}
 .tip .row{display:flex;justify-content:space-between;gap:12px;font-variant-numeric:tabular-nums}
 footer{color:var(--muted);font-size:.78rem}
+
+/* Solapas */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:-8px}
+.tab{background:none;border:none;border-bottom:3px solid transparent;padding:8px 14px;margin-bottom:-1px;cursor:pointer;font-family:var(--f-display);font-size:1.1rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.tab:hover{color:var(--fg)}
+.tab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--brand)}
+.tab .badge{font-family:var(--f-mono);font-size:.7rem;font-weight:500;letter-spacing:0;background:var(--crit);color:#fff;border-radius:999px;padding:1px 6px;margin-left:6px;vertical-align:2px}
+.tab .badge.warn{background:var(--warn)}
+.view{display:flex;flex-direction:column;gap:20px}
+.view[hidden]{display:none}
+
+/* Período personalizado */
+.custom{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.85rem;color:var(--fg2)}
+.custom[hidden]{display:none}
+.custom input{font:inherit;color:inherit;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:3px 6px}
+
+/* Proyección del promedio */
+.projavg{display:flex;flex-wrap:wrap;gap:8px 28px;align-items:baseline;border-top:1px dashed var(--axis);padding-top:10px}
+.projavg[hidden]{display:none}
+.projavg .pa-t{flex-basis:100%;font-family:var(--f-mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.projavg .pa{display:flex;flex-direction:column}
+.projavg .pa .v{font-family:var(--f-display);font-size:1.7rem;font-weight:600;line-height:1.1}
+.projavg .pa .v small{font-size:.9rem;color:var(--fg2);font-weight:500;margin-left:3px}
+.projavg .pa .k{font-size:.8rem;color:var(--fg2)}
+.projavg .pa-n{flex-basis:100%;font-size:.78rem;color:var(--muted)}
+
+/* Mantenimiento */
+.mkpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:820px){.mkpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi.crit{border-left:4px solid var(--crit)} .kpi.warn{border-left:4px solid var(--warn)} .kpi.ok{border-left:4px solid var(--ok)} .kpi.none{border-left:4px solid var(--axis)}
+.mgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
+.acpanel{border-left:4px solid var(--c)}
+.acpanel h2 .sub{font-family:var(--f-body);text-transform:none;letter-spacing:0;font-weight:400;margin-left:8px}
+.st{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;white-space:nowrap}
+.st::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.st.crit{color:var(--crit)} .st.warn{color:var(--warn)} .st.ok{color:var(--ok)} .st.none{color:var(--muted)} .st.info{color:var(--fg2)}
+.bar{width:120px;height:8px;border-radius:4px;background:var(--grid);overflow:hidden;display:inline-block;vertical-align:middle}
+.bar b{display:block;height:100%;border-radius:4px}
+.bar.crit b{background:var(--crit)} .bar.warn b{background:var(--warn)} .bar.ok b{background:var(--ok)}
+td.item{white-space:normal;min-width:10rem}
+td.item .obs{display:block;font-size:.76rem;color:var(--muted)}
+td.big{font-weight:600}
 @media (prefers-reduced-motion:no-preference){.seg{transition:opacity .15s}}
 </style>
 </head>
@@ -134,9 +176,8 @@ footer{color:var(--muted);font-size:.78rem}
 <div class="wrap">
   <header class="top">
     <div class="mark">
-      <span class="tail">CIAC · GEZ</span>
       <div>
-        <h1>Actividad de vuelo</h1>
+        <h1>Tablero de Actividad</h1>
         <div class="sub">Génesis Aviación · Registro de vuelos</div>
       </div>
     </div>
@@ -146,12 +187,22 @@ footer{color:var(--muted);font-size:.78rem}
     </div>
   </header>
 
+  <nav class="tabs" role="tablist" aria-label="Secciones">
+    <button class="tab" role="tab" type="button" data-view="act" aria-selected="true" aria-controls="view-act">Actividad</button>
+    <button class="tab" role="tab" type="button" data-view="mant" aria-selected="false" aria-controls="view-mant">Mantenimiento<span id="mant-badge"></span></button>
+  </nav>
+
   <div id="notice" hidden></div>
 
+  <div class="view" id="view-act" role="tabpanel">
   <section class="filters" aria-label="Filtros">
     <div class="fgroup">
       <span class="flabel">Período</span>
       <div class="chips" id="f-period"></div>
+      <span class="custom" id="f-custom" hidden>
+        <label class="flabel" for="f-from">Desde</label><input type="date" id="f-from">
+        <label class="flabel" for="f-to">Hasta</label><input type="date" id="f-to">
+      </span>
     </div>
     <div class="fgroup">
       <span class="flabel">Avión</span>
@@ -172,6 +223,7 @@ footer{color:var(--muted);font-size:.78rem}
     </div>
     <div class="chartbox" id="chart"></div>
     <p class="sub" id="proj-note" hidden></p>
+    <div class="projavg" id="proj-avg" hidden></div>
     <div><button class="link" id="toggle-table" type="button">Ver como tabla</button></div>
     <div class="tbl" id="month-table" hidden></div>
   </section>
@@ -204,8 +256,15 @@ footer{color:var(--muted);font-size:.78rem}
     <div class="phead"><h2 id="h-last">Últimos vuelos</h2><span class="sub" id="last-sub"></span></div>
     <div class="tbl" id="last"></div>
   </section>
+  </div>
 
-  <footer id="foot">Datos leídos en vivo de la pestaña «Vuelo» de la planilla Registro - Génesis Aviación y de los calendarios de cada avión.</footer>
+  <div class="view" id="view-mant" role="tabpanel" hidden>
+    <section class="mkpis" id="mkpis" aria-label="Resumen de mantenimiento"></section>
+    <div class="mgrid" id="mgrid"></div>
+    <p class="sub">Los ítems se cargan en la pestaña «Mantenimiento» de la planilla: avión, tipo, ítem, fecha en que se hizo, cada cuántas horas vence y/o fecha de vencimiento. Las horas se descuentan solas con lo volado en la pestaña «Vuelo» desde esa fecha. «Próximo» = quedan 10% de las horas (mínimo 5 h) o 30 días.</p>
+  </div>
+
+  <footer id="foot">Datos leídos en vivo de las pestañas «Vuelo» y «Mantenimiento» de la planilla Registro - Génesis Aviación y de los calendarios de cada avión.</footer>
 </div>
 <div class="tip" id="tip" hidden></div>
 
@@ -218,10 +277,18 @@ footer{color:var(--muted);font-size:.78rem}
   var AC_ORDER = ["IQB","S091","FPJ","CMD"];
   var AC_VAR = {IQB:"--s1",S091:"--s2",FPJ:"--s3",CMD:"--s4"};
   // Proyección: un calendario de Google por avión (ids en Code.gs). Cada turno cuenta lo que dura, con un tope de 7 h por evento.
-  var PROJ_DAYS = 90, EVENT_CAP = 7;
+  var PROJ_DAYS = 180, EVENT_CAP = 7;
 
-  var state = { rows: null, period: "12m", ac: {}, inst: "", showTable: false, updated: null, proj: null, projErr: null, projLoading: false };
-  try { var saved = JSON.parse(localStorage.getItem("gen-tablero") || "{}"); if (saved.period) state.period = saved.period; } catch(e) {}
+  var state = { rows: null, period: "12m", from: "", to: "", ac: {}, inst: "", showTable: false, updated: null, proj: null, projErr: null, projLoading: false, mant: [], view: "act" };
+  try {
+    var saved = JSON.parse(localStorage.getItem("gen-tablero") || "{}");
+    if (saved.period) state.period = saved.period;
+    if (saved.from) state.from = saved.from;
+    if (saved.to) state.to = saved.to;
+  } catch(e) {}
+  function savePrefs(){ try{ localStorage.setItem("gen-tablero", JSON.stringify({period: state.period, from: state.from, to: state.to})); }catch(x){} }
+  function isoDate(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+  function fromIso(s){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ""); return m ? new Date(+m[1], +m[2]-1, +m[3]) : null; }
 
   var $ = function(id){ return document.getElementById(id); };
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
@@ -287,6 +354,11 @@ footer{color:var(--muted);font-size:.78rem}
     var now = new Date();
     if (p === "12m") return [new Date(now.getFullYear(), now.getMonth()-11, 1), null];
     if (p === "all") return [null, null];
+    if (p === "custom"){
+      var f = fromIso(state.from), t = fromIso(state.to);
+      if (f && t && t < f){ var x = f; f = t; t = x; }
+      return [f, t ? new Date(t.getFullYear(), t.getMonth(), t.getDate()+1) : null];
+    }
     var y = +p;
     return [new Date(y,0,1), new Date(y+1,0,1)];
   }
@@ -312,7 +384,14 @@ footer{color:var(--muted);font-size:.78rem}
     var opts = [["12m","Últimos 12 meses"]];
     Object.keys(years).sort().reverse().forEach(function(y){ opts.push([y, y]); });
     opts.push(["all","Todo"]);
+    opts.push(["custom","Personalizado"]);
     if (!opts.some(function(o){ return o[0] === state.period; })) state.period = "12m";
+    var isC = state.period === "custom";
+    $("f-custom").hidden = !isC;
+    if (isC){
+      if ($("f-from").value !== state.from) $("f-from").value = state.from;
+      if ($("f-to").value !== state.to) $("f-to").value = state.to;
+    }
     $("f-period").innerHTML = opts.map(function(o){
       return '<button type="button" class="chip" data-p="'+o[0]+'" aria-pressed="'+(state.period===o[0])+'">'+esc(o[1])+'</button>';
     }).join("");
@@ -379,7 +458,7 @@ footer{color:var(--muted);font-size:.78rem}
   function monthSpan(rows){
     var rg = periodRange(state.period), start, end;
     if (rg[0]) start = rg[0]; else if (rows.length) start = new Date(rows[0].date.getFullYear(), rows[0].date.getMonth(), 1);
-    if (rg[1]) end = new Date(rg[1].getFullYear(), rg[1].getMonth()-1, 1);
+    if (rg[1]){ var last = new Date(rg[1].getTime() - 864e5); end = new Date(last.getFullYear(), last.getMonth(), 1); }
     else { var now = new Date(); end = new Date(now.getFullYear(), now.getMonth(), 1); }
     if (state.period !== "12m" && state.period !== "all"){
       var now2 = new Date(); if (end > now2) end = new Date(now2.getFullYear(), now2.getMonth(), 1);
@@ -590,6 +669,140 @@ footer{color:var(--muted);font-size:.78rem}
       }).join("") + '</tbody></table>';
   }
 
+  // ---------- Promedio mensual proyectado con la agenda ----------
+  function renderProjAvg(){
+    var el = $("proj-avg");
+    if (!state.proj || state.inst){ el.hidden = true; return; }
+    var now = new Date(), curK = monthKey(now);
+    // ventana de 12 meses que termina en el último mes completo que cubre la agenda
+    var horizon = new Date(now.getTime() + PROJ_DAYS * 864e5);
+    var endM = new Date(horizon.getFullYear(), horizon.getMonth(), 1);
+    if (new Date(horizon.getFullYear(), horizon.getMonth()+1, 0).getDate() !== horizon.getDate()) endM = new Date(endM.getFullYear(), endM.getMonth()-1, 1);
+    var ks = []; for (var i = 11; i >= 0; i--) ks.push(monthKey(new Date(endM.getFullYear(), endM.getMonth()-i, 1)));
+    var k0 = ks[0], k1 = ks[ks.length-1];
+    // ventana actual: últimos 12 meses completos
+    var ksNow = []; for (var j = 12; j >= 1; j--) ksNow.push(monthKey(new Date(now.getFullYear(), now.getMonth()-j, 1)));
+    var acSel = Object.keys(state.ac).filter(function(k){ return state.ac[k]; });
+    function avg(set, months, withProj){
+      set = set.filter(function(a){ return !acSel.length || acSel.indexOf(a) >= 0; });
+      if (!set.length) return null;
+      var first = null; state.rows.forEach(function(r){ if (set.indexOf(r.ac) >= 0){ var k = monthKey(r.date); if (first === null || k < first) first = k; } });
+      if (first === null) return null;
+      var ms = months.filter(function(k){ return k >= first; }); if (!ms.length) return null;
+      var inM = {}; ms.forEach(function(k){ inM[k] = 1; });
+      var tot = 0;
+      state.rows.forEach(function(r){ if (set.indexOf(r.ac) >= 0 && inM[monthKey(r.date)]) tot += r.hours; });
+      var ag = 0;
+      if (withProj) state.proj.forEach(function(r){ if (set.indexOf(r.ac) >= 0 && inM[monthKey(r.date)]) ag += r.hours; });
+      return { v: (tot + ag) / ms.length, n: ms.length, ag: ag };
+    }
+    var all = aircraftList();
+    var groups = [["Total", all], ["C150 (IQB + FPJ)", ["IQB","FPJ"]], ["S091", ["S091"]]];
+    var items = groups.map(function(g){
+      var p = avg(g[1], ks, true), c = avg(g[1], ksNow, false);
+      if (!p) return "";
+      var d = c ? p.v - c.v : null;
+      var dTxt = d == null ? "" : ' · <span class="'+(d>=0?'up':'down')+'">'+(d>=0?'▲ ':'▼ ')+fmtH(Math.abs(d))+' h</span> vs. hoy ('+fmtH(c.v)+')';
+      return '<div class="pa"><span class="v num">'+fmtH(p.v)+'<small>h/mes</small></span><span class="k">'+esc(g[0])+dTxt+'</span></div>';
+    }).join("");
+    if (!items){ el.hidden = true; return; }
+    el.hidden = false;
+    el.innerHTML = '<span class="pa-t">Promedio mensual proyectado · '+monthLabel(k0)+' → '+monthLabel(k1)+'</span>' + items +
+      '<span class="pa-n">12 meses: lo volado hasta hoy más lo agendado en Calendar hasta '+monthLabel(k1)+'. Los meses futuros solo cuentan los turnos ya cargados, así que va a subir a medida que se agende. «Hoy» = últimos 12 meses completos.</span>';
+  }
+
+  // ---------- Mantenimiento ----------
+  // Fila de la pestaña Mantenimiento: [Avión, Tipo, Ítem, Fecha realizado, Cada (horas), Vence (fecha), Observaciones]
+  var ST_RANK = {crit:0, warn:1, none:2, info:3, ok:4};
+  var ST_TXT = {crit:"Vencido", warn:"Próximo", ok:"Al día", none:"Faltan datos", info:"Seguimiento"};
+  function fmtDays(n){ return Math.abs(n) === 1 ? "1 día" : fmtInt(Math.abs(n)) + " días"; }
+  function mantItems(){
+    var today = new Date(); today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    var rateFrom = new Date(today.getTime() - 60*864e5), rate = {};
+    (state.rows || []).forEach(function(r){ if (r.date >= rateFrom) rate[r.ac] = (rate[r.ac]||0) + r.hours/60; });
+    return (state.mant || []).map(function(m){
+      var ac = clean(m[0]).toUpperCase(), tipo = clean(m[1]), item = clean(m[2]);
+      if (!ac && !item) return null;
+      var done = parseDate(m[3]), every = parseHours(m[4]), due = parseDate(m[5]), obs = clean(m[6]);
+      if (!(every > 0)) every = null;
+      var t = tipo.toLowerCase(), o = { ac: ac || "Sin avión", tipo: tipo || "—", item: item || "—", obs: obs, done: done, every: every, due: due, st: "ok", notes: [] };
+      if (done) o.since = sum((state.rows || []).filter(function(r){ return r.ac === ac && r.date >= done; }));
+      var sts = [];
+      if (every){
+        if (!done){ sts.push("none"); o.notes.push("Falta cargar la fecha en que se hizo"); }
+        else {
+          o.left = every - o.since; o.pct = o.since / every;
+          var warnAt = Math.max(5, every * 0.1);
+          sts.push(o.left < 0 ? "crit" : o.left <= warnAt ? "warn" : "ok");
+          if (o.left > 0 && rate[ac] > 0) o.eta = Math.round(o.left / rate[ac]);
+        }
+      }
+      if (due){
+        o.days = Math.round((due - today) / 864e5);
+        sts.push(o.days < 0 ? "crit" : o.days <= 30 ? "warn" : "ok");
+      }
+      if (!every && !due){
+        if (/repar/.test(t) && done) sts.push("info");
+        else if (/venc|p[oó]liza|seguro|anual/.test(t + " " + item.toLowerCase())){ sts.push("none"); o.notes.push("Falta cargar la fecha de vencimiento"); }
+        else { sts.push("none"); o.notes.push(done ? "Falta cargar cada cuántas horas" : "Falta cargar fecha y horas"); }
+      }
+      o.st = sts.sort(function(a,b){ return ST_RANK[a] - ST_RANK[b]; })[0];
+      return o;
+    }).filter(Boolean);
+  }
+  function renderMant(){
+    var items = mantItems();
+    var cnt = {crit:0, warn:0, ok:0, none:0, info:0};
+    items.forEach(function(o){ cnt[o.st]++; });
+    var badge = $("mant-badge");
+    badge.className = cnt.crit ? "badge" : cnt.warn ? "badge warn" : "";
+    badge.textContent = cnt.crit ? cnt.crit : cnt.warn ? cnt.warn : "";
+    badge.title = cnt.crit ? "Ítems vencidos" : cnt.warn ? "Ítems próximos a vencer" : "";
+    function mk(cls, k, v, d){ return '<div class="kpi '+cls+'"><span class="k">'+k+'</span><span class="v num">'+v+'</span><span class="d">'+d+'</span></div>'; }
+    $("mkpis").innerHTML =
+      mk("crit", "Vencidos", cnt.crit, "Pasados de horas o de fecha") +
+      mk("warn", "Próximos", cnt.warn, "≤10% de horas (mín. 5 h) o ≤30 días") +
+      mk("ok", "Al día", cnt.ok + cnt.info, cnt.info ? cnt.info + (cnt.info === 1 ? " reparación" : " reparaciones") + " en seguimiento" : "Con margen") +
+      mk("none", "Faltan datos", cnt.none, "Completar en la planilla");
+    if (!items.length){
+      $("mgrid").innerHTML = '<div class="notice"><b>Todavía no hay ítems de mantenimiento</b><span>Cargalos en la pestaña «Mantenimiento» de la planilla y tocá «Actualizar».</span></div>';
+      return;
+    }
+    var byAc = {}; items.forEach(function(o){ (byAc[o.ac] || (byAc[o.ac] = [])).push(o); });
+    var order = AC_ORDER.filter(function(a){ return byAc[a]; });
+    Object.keys(byAc).sort().forEach(function(a){ if (order.indexOf(a) < 0) order.push(a); });
+    $("mgrid").innerHTML = order.map(function(a){
+      var list = byAc[a].slice().sort(function(x,y){
+        if (ST_RANK[x.st] !== ST_RANK[y.st]) return ST_RANK[x.st] - ST_RANK[y.st];
+        var lx = x.left != null ? x.left : 1e9, ly = y.left != null ? y.left : 1e9; return lx - ly;
+      });
+      var worst = list[0].st;
+      var rowsHtml = list.map(function(o){
+        var rest = "—", bar = "", eta = "";
+        if (o.every && o.done){
+          rest = o.left < 0 ? '<span class="st crit" style="font-weight:600">'+fmtH(-o.left)+' h pasadas</span>' : fmtH(o.left) + ' h';
+          var pc = Math.max(0, Math.min(1, o.pct));
+          bar = '<span class="bar '+(o.left < 0 ? "crit" : o.st === "warn" ? "warn" : "ok")+'" title="'+Math.round(o.pct*100)+'% usado"><b style="width:'+(pc*100)+'%"></b></span>';
+          if (o.eta != null) eta = '≈ '+fmtDays(o.eta);
+        }
+        var venc = "—";
+        if (o.due) venc = fmtDate(o.due) + '<br><span class="sub">' + (o.days < 0 ? 'vencido hace ' + fmtDays(o.days) : o.days === 0 ? 'vence hoy' : 'en ' + fmtDays(o.days)) + '</span>';
+        var note = o.notes.length ? '<span class="obs">'+esc(o.notes.join(" · "))+'</span>' : '';
+        var obs = o.obs ? '<span class="obs">'+esc(o.obs)+'</span>' : '';
+        return '<tr><td class="item"><b>'+esc(o.item)+'</b>'+obs+note+'</td><td><span class="tag">'+esc(o.tipo)+'</span></td>'+
+          '<td class="num">'+(o.done ? fmtDate(o.done) : '—')+'</td>'+
+          '<td class="r">'+(o.every ? fmtH(o.every)+' h' : '—')+'</td>'+
+          '<td class="r">'+(o.since != null ? fmtH(o.since)+' h' : '—')+'</td>'+
+          '<td class="r big">'+rest+'</td><td>'+bar+'</td><td class="sub">'+eta+'</td>'+
+          '<td class="num">'+venc+'</td>'+
+          '<td><span class="st '+o.st+'">'+ST_TXT[o.st]+'</span></td></tr>';
+      }).join("");
+      var lastF = (state.rows || []).filter(function(r){ return r.ac === a; }).pop();
+      return '<section class="panel acpanel" style="--c:'+acColor(a)+'"><div class="phead"><h2>'+esc(a)+'<span class="sub">'+(lastF ? 'último vuelo '+fmtDate(lastF.date) : '')+'</span></h2><span class="st '+worst+'">'+ST_TXT[worst]+'</span></div>'+
+        '<div class="tbl"><table><thead><tr><th>Ítem</th><th>Tipo</th><th>Realizado</th><th class="r">Cada</th><th class="r">Voladas desde</th><th class="r">Restan</th><th>Uso</th><th>Al ritmo actual</th><th>Vence</th><th>Estado</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div></section>';
+    }).join("");
+  }
+
   function render(){
     if (!state.rows) return;
     renderFilters();
@@ -601,6 +814,8 @@ footer{color:var(--muted);font-size:.78rem}
     stackedRank(rows, "pilot", 12, $("students"));
     renderPurpose(rows);
     renderLast(rows);
+    renderProjAvg();
+    renderMant();
     $("month-table").hidden = !state.showTable;
     $("toggle-table").textContent = state.showTable ? "Ocultar tabla" : "Ver como tabla";
   }
@@ -608,9 +823,31 @@ footer{color:var(--muted);font-size:.78rem}
   // ---------- Eventos ----------
   document.addEventListener("click", function(e){
     var p = e.target.closest("[data-p]"), a = e.target.closest("[data-ac]");
-    if (p){ state.period = p.getAttribute("data-p"); try{ localStorage.setItem("gen-tablero", JSON.stringify({period: state.period})); }catch(x){} render(); }
+    var v = e.target.closest("[data-view]");
+    if (p){
+      state.period = p.getAttribute("data-p");
+      if (state.period === "custom" && !state.from && !state.to){
+        // arranca con los últimos 3 meses como punto de partida
+        var n = new Date(); state.from = isoDate(new Date(n.getFullYear(), n.getMonth()-2, 1)); state.to = isoDate(n);
+      }
+      savePrefs(); render();
+    }
     if (a){ var k = a.getAttribute("data-ac"); state.ac[k] = !state.ac[k]; render(); }
+    if (v) setView(v.getAttribute("data-view"), true);
   });
+  function onCustom(){ state.from = $("f-from").value; state.to = $("f-to").value; savePrefs(); render(); }
+  $("f-from").addEventListener("change", onCustom);
+  $("f-to").addEventListener("change", onCustom);
+  function setView(v, push){
+    state.view = v === "mant" ? "mant" : "act";
+    $("view-act").hidden = state.view !== "act";
+    $("view-mant").hidden = state.view !== "mant";
+    document.querySelectorAll("[data-view]").forEach(function(b){ b.setAttribute("aria-selected", String(b.getAttribute("data-view") === state.view)); });
+    if (push){ try { history.replaceState(null, "", state.view === "mant" ? "#mantenimiento" : location.pathname + location.search); } catch(x) { location.hash = state.view === "mant" ? "mantenimiento" : ""; } }
+    if (state.view === "act") render();
+  }
+  window.addEventListener("hashchange", function(){ setView(/mant/i.test(location.hash) ? "mant" : "act", false); });
+  setView(/mant/i.test(location.hash) ? "mant" : "act", false);
   $("f-inst").addEventListener("change", function(e){ state.inst = e.target.value; render(); });
   $("toggle-table").addEventListener("click", function(){ state.showTable = !state.showTable; render(); });
   var rt; window.addEventListener("resize", function(){ clearTimeout(rt); rt = setTimeout(render, 150); });
@@ -676,6 +913,7 @@ footer{color:var(--muted);font-size:.78rem}
     var rows = [[]].concat(d.vuelos.map(function(c){
       var r = []; r[1] = c[0]; r[2] = c[1]; r[3] = c[2]; r[4] = c[3]; r[5] = c[4]; r[6] = c[5]; r[9] = c[6]; r[13] = c[7]; return r;
     }));
+    state.mant = d.mant || [];
     onSheetData(rows, d.ts);
     onAgenda(d.agenda || []);
     render();
