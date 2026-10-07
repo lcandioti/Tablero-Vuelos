@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tablero de Vuelo Génesis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: bitácora de operaciones — barra de marca, filtros en una fila, KPIs, gráfico mensual protagonista, flota + instructores en dos columnas, alumnos y últimos vuelos abajo. */
+:root{
+  --bg:#f6f6f4; --surface:#fdfdfc; --fg:#141413; --fg2:#55534f; --muted:#8a8780;
+  --grid:#e4e2dc; --axis:#c6c3b9; --line:rgba(20,20,19,.10);
+  --brand:#c41230; --brand-ink:#ffffff; --brand-soft:#f7e3e6;
+  --s1:#c41230; --s2:#8f8c85; --s3:#f2a7b2; --s4:#2e2d2b; --s5:#c9c6be;
+  --up:#006300; --down:#b3261e;
+  --f-display:"Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f0f0e; --surface:#1a1a19; --fg:#f4f3ef; --fg2:#c3c2b7; --muted:#8f8c84;
+    --grid:#2c2c2a; --axis:#3d3d3a; --line:rgba(255,255,255,.10);
+    --brand:#e0425b; --brand-ink:#ffffff; --brand-soft:#3a1a20;
+    --s1:#e0425b; --s2:#9a978f; --s3:#f7bcc5; --s4:#615f5a; --s5:#45433f;
+    --up:#3fbf3f; --down:#ff8a80; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f0f0e; --surface:#1a1a19; --fg:#f4f3ef; --fg2:#c3c2b7; --muted:#8f8c84;
+  --grid:#2c2c2a; --axis:#3d3d3a; --line:rgba(255,255,255,.10);
+  --brand:#e0425b; --brand-ink:#ffffff; --brand-soft:#3a1a20;
+  --s1:#e0425b; --s2:#9a978f; --s3:#f7bcc5; --s4:#615f5a; --s5:#45433f;
+  --up:#3fbf3f; --down:#ff8a80; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.5;padding:0 16px;}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 48px;display:flex;flex-direction:column;gap:20px}
+h1,h2{font-family:var(--f-display);font-weight:600;letter-spacing:.01em;margin:0;text-wrap:balance}
+h1{font-size:2rem;line-height:1.05}
+h2{font-size:1.25rem;text-transform:uppercase;letter-spacing:.06em}
+.num{font-variant-numeric:tabular-nums}
+button,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* Cabecera */
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:3px solid var(--brand);padding-bottom:12px}
+.mark{display:flex;align-items:center;gap:12px}
+.tail{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--brand-ink);background:var(--brand);padding:3px 8px;border-radius:3px;white-space:nowrap}
+.sub{color:var(--fg2);font-size:.85rem}
+.status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.8rem;color:var(--fg2)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;margin-right:6px;vertical-align:middle}
+.dot.live{background:#0ca30c}
+.dot.warn{background:#fab219}
+.dot.err{background:#d03b3b}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:6px 12px;cursor:pointer}
+.btn:hover{border-color:var(--fg2)}
+
+/* Filtros */
+.filters{display:flex;flex-wrap:wrap;gap:16px 24px;align-items:center}
+.fgroup{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flabel{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px;cursor:pointer;font-size:.85rem;display:inline-flex;align-items:center;gap:6px}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chip .sw{width:10px;height:10px;border-radius:2px}
+select.sel{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:5px 8px;max-width:220px}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi .k{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.kpi .v{font-family:var(--f-display);font-size:2.3rem;font-weight:600;line-height:1.1}
+.kpi .v small{font-size:1rem;color:var(--fg2);font-weight:500;margin-left:4px}
+.kpi .d{font-size:.8rem;color:var(--fg2)}
+.up{color:var(--up)} .down{color:var(--down)}
+@media (max-width:820px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Paneles */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.phead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.82rem;color:var(--fg2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.chartbox{overflow-x:auto;position:relative}
+.chartbox svg{display:block}
+.link{background:none;border:none;color:var(--fg2);text-decoration:underline;cursor:pointer;padding:0;font-size:.82rem}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+@media (max-width:820px){.cols{grid-template-columns:minmax(0,1fr)}}
+
+/* Flota */
+.fleet{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.ac{border:1px solid var(--line);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:4px;position:relative;overflow:hidden}
+.ac::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c)}
+.ac .reg{font-family:var(--f-mono);font-size:.8rem;letter-spacing:.08em;color:var(--fg2)}
+.ac .hrs{font-family:var(--f-display);font-size:1.8rem;font-weight:600;line-height:1.1}
+.ac .meta{font-size:.78rem;color:var(--fg2)}
+.ac .avg{font-size:.85rem;font-weight:500;color:var(--fg)}
+.ac .avg .sub{font-size:.75rem;font-weight:400}
+
+/* Barras horizontales */
+.hbars{display:flex;flex-direction:column;gap:8px}
+.hrow{display:grid;grid-template-columns:minmax(0,9.5rem) minmax(0,1fr) 4.2rem;gap:10px;align-items:center;font-size:.85rem}
+.hrow .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hrow .track{height:12px;background:transparent;border-radius:3px;display:flex;gap:2px}
+.hrow .track b{height:100%;border-radius:2px;display:block;min-width:2px}
+.hrow .val{text-align:right;font-variant-numeric:tabular-nums;color:var(--fg2)}
+
+/* Tablas */
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.84rem}
+th{font-family:var(--f-mono);font-weight:500;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--axis);white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid var(--grid);white-space:nowrap}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+.tag{font-family:var(--f-mono);font-size:.72rem;padding:1px 6px;border-radius:3px;border:1px solid var(--line);color:var(--fg2)}
+.acdot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:middle}
+
+/* Estados */
+.notice{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:6px}
+.notice b{font-family:var(--f-display);font-size:1.15rem;font-weight:600}
+.skel{height:14px;border-radius:3px;background:var(--grid)}
+.tip{position:fixed;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:var(--r);padding:8px 10px;font-size:.8rem;line-height:1.35;z-index:10;max-width:220px;box-shadow:0 4px 16px rgba(0,0,0,.18)}
+.tip .t{font-family:var(--f-mono);font-size:.72rem;opacity:.8;margin-bottom:2px}
+.tip .row{display:flex;justify-content:space-between;gap:12px;font-variant-numeric:tabular-nums}
+footer{color:var(--muted);font-size:.78rem}
+@media (prefers-reduced-motion:no-preference){.seg{transition:opacity .15s}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="mark">
+      <span class="tail">CIAC · GEZ</span>
+      <div>
+        <h1>Actividad de vuelo</h1>
+        <div class="sub">Génesis Aviación · Registro de vuelos</div>
+      </div>
+    </div>
+    <div class="status">
+      <span id="status"><span class="dot"></span>Conectando con la planilla…</span>
+      <button class="btn" id="refresh" type="button">Actualizar</button>
+    </div>
+  </header>
+
+  <div id="notice" hidden></div>
+
+  <section class="filters" aria-label="Filtros">
+    <div class="fgroup">
+      <span class="flabel">Período</span>
+      <div class="chips" id="f-period"></div>
+    </div>
+    <div class="fgroup">
+      <span class="flabel">Avión</span>
+      <div class="chips" id="f-ac"></div>
+    </div>
+    <div class="fgroup">
+      <label class="flabel" for="f-inst">Instructor</label>
+      <select class="sel" id="f-inst"><option value="">Todos</option></select>
+    </div>
+  </section>
+
+  <section class="kpis" id="kpis" aria-label="Indicadores"></section>
+
+  <section class="panel" aria-labelledby="h-month">
+    <div class="phead">
+      <h2 id="h-month">Horas por mes y avión</h2>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="chartbox" id="chart"></div>
+    <p class="sub" id="proj-note" hidden></p>
+    <div><button class="link" id="toggle-table" type="button">Ver como tabla</button></div>
+    <div class="tbl" id="month-table" hidden></div>
+  </section>
+
+  <div class="cols">
+    <section class="panel" aria-labelledby="h-fleet">
+      <div class="phead"><h2 id="h-fleet">Flota</h2><span class="sub" id="fleet-sub"></span></div>
+      <div class="fleet" id="fleet"></div>
+    </section>
+    <section class="panel" aria-labelledby="h-inst">
+      <div class="phead"><h2 id="h-inst">Instructores</h2><span class="sub">Horas en el período</span></div>
+      <div class="hbars" id="instructors"></div>
+    </section>
+  </div>
+
+  <div class="cols">
+    <section class="panel" aria-labelledby="h-stu">
+      <div class="phead"><h2 id="h-stu">Alumnos y pilotos</h2><span class="sub">Top 12 por horas</span></div>
+      <div class="hbars" id="students"></div>
+    </section>
+    <section class="panel" aria-labelledby="h-fin">
+      <div class="phead"><h2 id="h-fin">Finalidad</h2><span class="sub">Horas y vuelos</span></div>
+      <div class="hbars" id="purpose"></div>
+      <div class="phead" style="margin-top:6px"><h2>Destinos</h2><span class="sub">Vuelos que salieron de la base</span></div>
+      <div class="hbars" id="dest"></div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="h-last">
+    <div class="phead"><h2 id="h-last">Últimos vuelos</h2><span class="sub" id="last-sub"></span></div>
+    <div class="tbl" id="last"></div>
+  </section>
+
+  <footer id="foot">Datos leídos en vivo de la pestaña «Vuelo» de la planilla Registro - Génesis Aviación y de los calendarios de cada avión.</footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(function(){
+  "use strict";
+  var BASE = "GEZ";
+  var MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  var MESES_L = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  var AC_ORDER = ["IQB","S091","FPJ","CMD"];
+  var AC_VAR = {IQB:"--s1",S091:"--s2",FPJ:"--s3",CMD:"--s4"};
+  // Proyección: un calendario de Google por avión (ids en Code.gs). Cada turno cuenta lo que dura, con un tope de 7 h por evento.
+  var PROJ_DAYS = 90, EVENT_CAP = 7;
+
+  var state = { rows: null, period: "12m", ac: {}, inst: "", showTable: false, updated: null, proj: null, projErr: null, projLoading: false };
+  try { var saved = JSON.parse(localStorage.getItem("gen-tablero") || "{}"); if (saved.period) state.period = saved.period; } catch(e) {}
+
+  var $ = function(id){ return document.getElementById(id); };
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
+  function fmtH(h){ return h.toLocaleString("es-AR",{minimumFractionDigits:1,maximumFractionDigits:1}); }
+  function fmtInt(n){ return n.toLocaleString("es-AR"); }
+  function monthKey(d){ return d.getFullYear()*100 + d.getMonth(); }
+  function monthLabel(k){ return MESES[k%100] + "-" + String(Math.floor(k/100)).slice(2); }
+  function fmtDate(d){ return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+String(d.getFullYear()).slice(2); }
+  function cssVar(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+  function acColor(a){ return "var(" + (AC_VAR[a] || "--s5") + ")"; }
+
+  // ---------- Parseo ----------
+  function parseDate(s){
+    if (!s) return null;
+    var m = String(s).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (m){
+      var y = +m[3]; if (y < 100) y += 2000;
+      var d = new Date(y, +m[2]-1, +m[1]);
+      return isNaN(d) ? null : d;
+    }
+    var iso = String(s).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return new Date(+iso[1], +iso[2]-1, +iso[3]);
+    return null;
+  }
+  function parseHours(s){
+    if (s == null) return null;
+    if (typeof s === "number") return s;
+    var t = String(s).trim();
+    var hm = t.match(/^(\d{1,2}):(\d{2})/);
+    if (hm) return +hm[1] + (+hm[2])/60;
+    var m = t.match(/\d+(?:[.,]\d+)?/);
+    if (!m) return null;
+    var v = parseFloat(m[0].replace(",", "."));
+    return isNaN(v) ? null : v;
+  }
+  function clean(s){ return String(s == null ? "" : s).replace(/\s+/g," ").trim(); }
+  function parseRows(values){
+    var out = [];
+    if (!values || !values.length) return out;
+    for (var i = 1; i < values.length; i++){
+      var r = values[i] || [];
+      var date = parseDate(r[1]) || parseDate(r[0]);
+      var h = parseHours(r[9]);
+      if (!date || h == null || h <= 0 || h > 24) continue;
+      var ac = clean(r[13]).toUpperCase() || "Sin dato";
+      var inst = clean(r[4]);
+      if (!inst || /^n\/?a$/i.test(inst) || inst === "-") inst = "Sin instructor";
+      out.push({
+        date: date, hours: h, ac: ac,
+        pilot: clean(r[2]) || "Sin nombre",
+        purpose: clean(r[3]).toUpperCase() || "—",
+        inst: inst,
+        from: clean(r[5]).toUpperCase(), to: clean(r[6]).toUpperCase(),
+        dep: clean(r[7]), arr: clean(r[8])
+      });
+    }
+    out.sort(function(a,b){ return a.date - b.date; });
+    return out;
+  }
+
+  // ---------- Filtros ----------
+  function periodRange(p){
+    var now = new Date();
+    if (p === "12m") return [new Date(now.getFullYear(), now.getMonth()-11, 1), null];
+    if (p === "all") return [null, null];
+    var y = +p;
+    return [new Date(y,0,1), new Date(y+1,0,1)];
+  }
+  function filtered(){
+    var rg = periodRange(state.period), acSel = Object.keys(state.ac).filter(function(k){ return state.ac[k]; });
+    return state.rows.filter(function(r){
+      if (rg[0] && r.date < rg[0]) return false;
+      if (rg[1] && r.date >= rg[1]) return false;
+      if (acSel.length && acSel.indexOf(r.ac) < 0) return false;
+      if (state.inst && r.inst !== state.inst) return false;
+      return true;
+    });
+  }
+  function aircraftList(){
+    var seen = {}; state.rows.forEach(function(r){ seen[r.ac] = (seen[r.ac]||0) + r.hours; });
+    var list = AC_ORDER.filter(function(a){ return seen[a]; });
+    Object.keys(seen).sort().forEach(function(a){ if (list.indexOf(a) < 0) list.push(a); });
+    return list;
+  }
+
+  function renderFilters(){
+    var years = {}; state.rows.forEach(function(r){ years[r.date.getFullYear()] = 1; });
+    var opts = [["12m","Últimos 12 meses"]];
+    Object.keys(years).sort().reverse().forEach(function(y){ opts.push([y, y]); });
+    opts.push(["all","Todo"]);
+    if (!opts.some(function(o){ return o[0] === state.period; })) state.period = "12m";
+    $("f-period").innerHTML = opts.map(function(o){
+      return '<button type="button" class="chip" data-p="'+o[0]+'" aria-pressed="'+(state.period===o[0])+'">'+esc(o[1])+'</button>';
+    }).join("");
+    $("f-ac").innerHTML = aircraftList().map(function(a){
+      return '<button type="button" class="chip" data-ac="'+esc(a)+'" aria-pressed="'+(!!state.ac[a])+'"><span class="sw" style="background:'+acColor(a)+'"></span>'+esc(a)+'</button>';
+    }).join("");
+    var insts = {}; state.rows.forEach(function(r){ insts[r.inst] = (insts[r.inst]||0)+r.hours; });
+    var names = Object.keys(insts).sort(function(a,b){ return insts[b]-insts[a]; });
+    var sel = $("f-inst"), cur = state.inst;
+    sel.innerHTML = '<option value="">Todos</option>' + names.map(function(n){ return '<option'+(n===cur?' selected':'')+'>'+esc(n)+'</option>'; }).join("");
+  }
+
+  // ---------- KPIs ----------
+  function sum(rows){ return rows.reduce(function(s,r){ return s + r.hours; }, 0); }
+  function renderKpis(rows){
+    var now = new Date(), curK = monthKey(now), prevK = monthKey(new Date(now.getFullYear(), now.getMonth()-1, 1));
+    var base = state.rows.filter(function(r){
+      var acSel = Object.keys(state.ac).filter(function(k){ return state.ac[k]; });
+      if (acSel.length && acSel.indexOf(r.ac) < 0) return false;
+      if (state.inst && r.inst !== state.inst) return false;
+      return true;
+    });
+    var cur = sum(base.filter(function(r){ return monthKey(r.date) === curK; }));
+    var prev = sum(base.filter(function(r){ return monthKey(r.date) === prevK; }));
+    // mismo día del mes anterior, para comparar parejo
+    var day = now.getDate();
+    var prevToDate = sum(base.filter(function(r){ return monthKey(r.date) === prevK && r.date.getDate() <= day; }));
+    var total = sum(rows), n = rows.length;
+    var months = {}; rows.forEach(function(r){ months[monthKey(r.date)] = 1; });
+    var nm = Object.keys(months).length || 1;
+    var delta = prevToDate ? (cur - prevToDate) / prevToDate : null;
+    var dTxt = delta == null ? "Sin vuelos a esta altura del mes anterior"
+      : '<span class="'+(delta>=0?'up':'down')+'">'+(delta>=0?'▲ ':'▼ ')+Math.abs(Math.round(delta*100))+'%</span> vs. '+fmtH(prevToDate)+' h al día '+day+' de '+MESES_L[(now.getMonth()+11)%12];
+    $("kpis").innerHTML =
+      kpi("Horas en el período", fmtH(total), "h", fmtInt(n)+" vuelos registrados") +
+      kpi("Horas de "+MESES_L[now.getMonth()], fmtH(cur), "h", dTxt + projLine(curK)) +
+      kpi("Mes anterior", fmtH(prev), "h", "Total de "+MESES_L[(now.getMonth()+11)%12]) +
+      kpi("Promedio mensual", fmtH(total/nm), "h", fmtH(n ? total/n : 0)+" h por vuelo en promedio");
+  }
+  function projLine(curK){
+    if (state.inst) return '<br><span class="sub">Proyección no disponible con filtro de instructor</span>';
+    if (state.projLoading && !state.proj) return '<br><span class="sub">Leyendo agenda…</span>';
+    if (!state.proj) return '';
+    var acSel = Object.keys(state.ac).filter(function(k){ return state.ac[k]; });
+    var p = sum(state.proj.filter(function(r){ return monthKey(r.date) === curK && (!acSel.length || acSel.indexOf(r.ac) >= 0); }));
+    var base = state.rows.filter(function(r){ return monthKey(r.date) === curK && (!acSel.length || acSel.indexOf(r.ac) >= 0); });
+    return '<br>+'+fmtH(p)+' h agendadas → <b>'+fmtH(sum(base)+p)+' h</b> proyectadas';
+  }
+  function kpi(k,v,u,d){ return '<div class="kpi"><span class="k">'+esc(k)+'</span><span class="v num">'+v+'<small>'+u+'</small></span><span class="d">'+d+'</span></div>'; }
+
+  // ---------- Proyección ----------
+  function projRows(){
+    if (!state.proj || state.inst) return [];
+    var rg = periodRange(state.period), acSel = Object.keys(state.ac).filter(function(k){ return state.ac[k]; });
+    return state.proj.filter(function(r){
+      if (rg[0] && r.date < rg[0]) return false;
+      if (rg[1] && r.date >= rg[1]) return false;
+      if (acSel.length && acSel.indexOf(r.ac) < 0) return false;
+      return true;
+    });
+  }
+
+  // ---------- Gráfico mensual ----------
+  function monthSpan(rows){
+    var rg = periodRange(state.period), start, end;
+    if (rg[0]) start = rg[0]; else if (rows.length) start = new Date(rows[0].date.getFullYear(), rows[0].date.getMonth(), 1);
+    if (rg[1]) end = new Date(rg[1].getFullYear(), rg[1].getMonth()-1, 1);
+    else { var now = new Date(); end = new Date(now.getFullYear(), now.getMonth(), 1); }
+    if (state.period !== "12m" && state.period !== "all"){
+      var now2 = new Date(); if (end > now2) end = new Date(now2.getFullYear(), now2.getMonth(), 1);
+    }
+    projRows().forEach(function(r){ var mk = new Date(r.date.getFullYear(), r.date.getMonth(), 1); if (mk > end) end = mk; });
+    var ks = []; if (!start) return ks;
+    for (var d = new Date(start); d <= end; d = new Date(d.getFullYear(), d.getMonth()+1, 1)) ks.push(monthKey(d));
+    return ks;
+  }
+  function renderChart(rows){
+    var acs = aircraftList().filter(function(a){ return rows.some(function(r){ return r.ac === a; }); });
+    var ks = monthSpan(rows);
+    var data = {}; ks.forEach(function(k){ data[k] = {}; });
+    rows.forEach(function(r){ var k = monthKey(r.date); if (data[k]) data[k][r.ac] = (data[k][r.ac]||0) + r.hours; });
+    var pdata = {}; ks.forEach(function(k){ pdata[k] = {}; });
+    var prows = projRows();
+    prows.forEach(function(r){ var k = monthKey(r.date); if (pdata[k]) pdata[k][r.ac] = (pdata[k][r.ac]||0) + r.hours; });
+    prows.forEach(function(r){ if (acs.indexOf(r.ac) < 0) acs.push(r.ac); });
+    var hasProj = prows.length > 0;
+    var legendHtml = acs.map(function(a){ return '<span><i style="background:'+acColor(a)+'"></i>'+esc(a)+'</span>'; }).join("") +
+      (hasProj ? '<span><i style="background:var(--fg2);opacity:.3;outline:1px dashed var(--fg2);outline-offset:-1px"></i>Agendado</span>' : '');
+    $("legend").innerHTML = legendHtml;
+    if (!ks.length || (!rows.length && !hasProj)){ $("chart").innerHTML = '<p class="sub">No hay vuelos con estos filtros.</p>'; $("month-table").innerHTML=""; return; }
+    // Líneas de referencia: promedio mensual sobre meses completos del período (sin el mes en curso),
+    // contando desde el primer vuelo de cada grupo — mismo criterio que la tarjeta de flota.
+    var curK0 = monthKey(new Date()), comp = ks.filter(function(k){ return k < curK0; });
+    function firstMonth(set){
+      var f = null; state.rows.forEach(function(r){ if (set.indexOf(r.ac) >= 0){ var k = monthKey(r.date); if (f === null || k < f) f = k; } });
+      return f;
+    }
+    function groupAvg(set){
+      set = set.filter(function(a){ return acs.indexOf(a) >= 0; });
+      if (!set.length) return null;
+      var f = firstMonth(set), months = comp.filter(function(k){ return k >= f; });
+      if (!months.length) return null;
+      var tot = 0; months.forEach(function(k){ set.forEach(function(a){ tot += data[k][a] || 0; }); });
+      return { v: tot / months.length, n: months.length };
+    }
+    var refs = [
+      { name: "Prom. total", set: acs.slice(), stroke: "var(--fg)", dash: "", w: 1.75, op: 1 },
+      { name: "Prom. C150", set: ["IQB","FPJ"], stroke: "var(--s1)", dash: "6 4", w: 1.5, op: .6 },
+      { name: "Prom. S091", set: ["S091"], stroke: "var(--s2)", dash: "6 4", w: 1.5, op: .6 }
+    ].map(function(r){ var a = groupAvg(r.set); if (!a) return null; r.v = a.v; r.n = a.n; return r; }).filter(Boolean);
+    if (refs.length){
+      $("legend").innerHTML = legendHtml + refs.map(function(r){
+        return '<span title="Promedio sobre '+r.n+' meses completos"><svg width="22" height="10" aria-hidden="true"><line x1="1" x2="21" y1="5" y2="5" stroke="'+r.stroke+'" stroke-width="'+r.w+'" stroke-dasharray="'+r.dash+'" opacity="'+r.op+'"/></svg>'+r.name+' <b class="num">'+fmtH(r.v)+' h</b></span>';
+      }).join("");
+    }
+    var totals = ks.map(function(k){ return acs.reduce(function(s,a){ return s + (data[k][a]||0); },0); });
+    var ptotals = ks.map(function(k){ return acs.reduce(function(s,a){ return s + (pdata[k][a]||0); },0); });
+    var grand = totals.map(function(t,i){ return t + ptotals[i]; });
+    var max = Math.max.apply(null, grand.concat([1]));
+    var step = niceStep(max/4), top = Math.ceil(max/step)*step;
+    var box = $("chart"), W = Math.max(box.clientWidth || 600, ks.length*34 + 50), H = 300;
+    var m = {l:40, r:(refs.length?58:8), t:22, b:34}, iw = W-m.l-m.r, ih = H-m.t-m.b;
+    var bw = iw/ks.length, barW = Math.max(6, Math.min(44, bw*0.68));
+    var y = function(v){ return m.t + ih - v/top*ih; };
+    var s = '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Horas por mes y avión">';
+    for (var g = 0; g <= top + 1e-9; g += step){
+      s += '<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+y(g)+'" y2="'+y(g)+'" stroke="var(--'+(g===0?'axis':'grid')+')" stroke-width="1"/>';
+      s += '<text x="'+(m.l-8)+'" y="'+(y(g)+4)+'" text-anchor="end" font-size="11" fill="var(--muted)" font-family="var(--f-mono)">'+g+'</text>';
+    }
+    var every = Math.ceil(ks.length / Math.max(1, Math.floor(iw/46))), hits = '';
+    ks.forEach(function(k,i){
+      var cx = m.l + bw*i + bw/2, x = cx - barW/2, acc = 0;
+      var segs = acs.filter(function(a){ return data[k][a]; });
+      segs.forEach(function(a, j){
+        var v = data[k][a], y0 = y(acc), y1 = y(acc+v), h = Math.max(0, y0-y1-(j<segs.length-1||acc>0?0:0));
+        var gap = j > 0 ? 2 : 0;
+        var isTop = j === segs.length-1 && !ptotals[i];
+        var hh = Math.max(0.5, y0 - y1 - gap);
+        if (isTop){
+          var rr = Math.min(4, hh/2, barW/2);
+          s += '<path class="seg" data-k="'+k+'" fill="'+acColor(a)+'" d="M'+x+','+(y0-gap)+' V'+(y1+rr)+' Q'+x+','+y1+' '+(x+rr)+','+y1+' H'+(x+barW-rr)+' Q'+(x+barW)+','+y1+' '+(x+barW)+','+(y1+rr)+' V'+(y0-gap)+' Z"/>';
+        } else {
+          s += '<rect class="seg" data-k="'+k+'" x="'+x+'" y="'+y1+'" width="'+barW+'" height="'+hh+'" fill="'+acColor(a)+'"/>';
+        }
+        acc += v;
+      });
+      // horas agendadas: mismo color del avión, translúcido y con borde punteado, encima de lo volado
+      acs.filter(function(a){ return pdata[k][a]; }).forEach(function(a){
+        var v = pdata[k][a], y0 = y(acc), y1 = y(acc+v), gap = acc > 0 ? 2 : 0, hh = Math.max(0.5, y0 - y1 - gap);
+        s += '<rect class="seg" data-k="'+k+'" x="'+(x+0.5)+'" y="'+(y1+0.5)+'" width="'+(barW-1)+'" height="'+Math.max(0.5,hh-1)+'" rx="2" fill="'+acColor(a)+'" fill-opacity=".28" stroke="'+acColor(a)+'" stroke-width="1" stroke-dasharray="3 2"/>';
+        acc += v;
+      });
+      if (grand[i] > 0 && (ks.length <= 24 || i === ks.length-1 || grand[i] === max))
+        s += '<text x="'+cx+'" y="'+(y(grand[i])-6)+'" text-anchor="middle" font-size="10.5" fill="var(--fg2)" font-family="var(--f-mono)">'+(ptotals[i] ? '~' : '')+Math.round(grand[i])+'</text>';
+      if (i % every === 0 || i === ks.length-1)
+        s += '<text x="'+cx+'" y="'+(H-m.b+16)+'" text-anchor="middle" font-size="11" fill="var(--'+(i===ks.length-1?'fg':'muted')+')" font-family="var(--f-mono)">'+monthLabel(k)+'</text>';
+      hits += '<rect class="hit" data-i="'+i+'" x="'+(m.l+bw*i)+'" y="'+m.t+'" width="'+bw+'" height="'+ih+'" fill="transparent"/>';
+    });
+    // líneas de referencia (con halo para que se lean sobre las barras) y etiquetas sin superponerse
+    var labs = refs.map(function(r){ return {r:r, y:y(r.v)}; }).sort(function(a,b){ return a.y - b.y; });
+    for (var li = 1; li < labs.length; li++) if (labs[li].y - labs[li-1].y < 13) labs[li].y = labs[li-1].y + 13;
+    refs.forEach(function(r){
+      var yy = y(r.v);
+      s += '<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+yy+'" y2="'+yy+'" stroke="var(--surface)" stroke-width="'+(r.w+3)+'" opacity="'+(r.op < 1 ? .45 : .85)+'"/>';
+      s += '<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+yy+'" y2="'+yy+'" stroke="'+r.stroke+'" stroke-width="'+r.w+'" stroke-dasharray="'+r.dash+'" opacity="'+r.op+'"/>';
+    });
+    labs.forEach(function(l){
+      s += '<text x="'+(W-m.r+6)+'" y="'+(l.y+4)+'" font-size="10.5" fill="var(--fg2)" font-family="var(--f-mono)">'+fmtH(l.r.v)+'</text>';
+    });
+    s += hits + '</svg>';
+    box.innerHTML = s;
+    if (box.scrollWidth > box.clientWidth) box.scrollLeft = box.scrollWidth;
+    var tip = $("tip");
+    box.querySelectorAll(".hit").forEach(function(el){
+      el.addEventListener("pointermove", function(ev){
+        var i = +el.getAttribute("data-i"), k = ks[i];
+        box.querySelectorAll(".seg").forEach(function(sg){ sg.style.opacity = (+sg.getAttribute("data-k") === k) ? "1" : ".35"; });
+        var html = '<div class="t">'+MESES_L[k%100]+' '+Math.floor(k/100)+'</div>';
+        acs.slice().reverse().forEach(function(a){ if (data[k][a]) html += '<div class="row"><span><span class="acdot" style="background:'+acColor(a)+'"></span>'+esc(a)+'</span><span>'+fmtH(data[k][a])+' h</span></div>'; });
+        html += '<div class="row" style="border-top:1px solid currentColor;margin-top:4px;padding-top:4px"><b>Volado</b><b>'+fmtH(totals[i])+' h</b></div>';
+        if (ptotals[i]){
+          acs.slice().reverse().forEach(function(a){ if (pdata[k][a]) html += '<div class="row" style="opacity:.8"><span><span class="acdot" style="background:'+acColor(a)+';opacity:.5"></span>'+esc(a)+' agendado</span><span>'+fmtH(pdata[k][a])+' h</span></div>'; });
+          html += '<div class="row"><b>Proyección</b><b>'+fmtH(grand[i])+' h</b></div>';
+        }
+        tip.innerHTML = html; tip.hidden = false;
+        var tx = ev.clientX + 14, ty = ev.clientY + 14;
+        if (tx + 230 > window.innerWidth) tx = ev.clientX - 234;
+        if (ty + tip.offsetHeight > window.innerHeight) ty = ev.clientY - tip.offsetHeight - 10;
+        tip.style.left = tx + "px"; tip.style.top = ty + "px";
+      });
+      el.addEventListener("pointerleave", function(){
+        tip.hidden = true;
+        box.querySelectorAll(".seg").forEach(function(sg){ sg.style.opacity = "1"; });
+      });
+    });
+    // tabla accesible
+    var t = '<table><thead><tr><th>Mes</th>' + acs.map(function(a){ return '<th class="r">'+esc(a)+'</th>'; }).join("") + '<th class="r">Volado</th>' + (hasProj ? '<th class="r">Agendado</th><th class="r">Proyección</th>' : '') + '</tr></thead><tbody>';
+    ks.slice().reverse().forEach(function(k,ri){
+      var i = ks.length-1-ri;
+      t += '<tr><td>'+monthLabel(k)+'</td>' + acs.map(function(a){ return '<td class="r">'+(data[k][a]?fmtH(data[k][a]):'—')+'</td>'; }).join("") + '<td class="r"><b>'+fmtH(totals[i])+'</b></td>' + (hasProj ? '<td class="r">'+(ptotals[i]?fmtH(ptotals[i]):'—')+'</td><td class="r">'+(ptotals[i]?'<b>'+fmtH(grand[i])+'</b>':'—')+'</td>' : '') + '</tr>';
+    });
+    $("month-table").innerHTML = t + '</tbody></table>';
+  }
+  function niceStep(x){
+    if (x <= 0) return 1;
+    var p = Math.pow(10, Math.floor(Math.log10(x))), f = x/p;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+  }
+
+  // ---------- Flota ----------
+  function renderFleet(rows){
+    var now = new Date(), curK = monthKey(now), acs = aircraftList();
+    // Promedio mensual: solo meses completos del período (se excluye el mes en curso),
+    // contados desde el primer vuelo del avión para no diluir a los que se sumaron después.
+    var complete = monthSpan(rows).filter(function(k){ return k < curK; });
+    var cards = acs.map(function(a){
+      var all = state.rows.filter(function(r){ return r.ac === a; });
+      if (!all.length) return "";
+      var mine = rows.filter(function(r){ return r.ac === a; });
+      var per = sum(mine);
+      var mes = sum(all.filter(function(r){ return monthKey(r.date) === curK; }));
+      var firstK = monthKey(all[0].date);
+      var months = complete.filter(function(k){ return k >= firstK; });
+      var inMonths = {}; months.forEach(function(k){ inMonths[k] = 1; });
+      var avgTxt = months.length
+        ? fmtH(sum(mine.filter(function(r){ return inMonths[monthKey(r.date)]; })) / months.length) + ' h/mes <span class="sub">(' + months.length + (months.length === 1 ? ' mes' : ' meses') + ')</span>'
+        : '— <span class="sub">(sin meses completos)</span>';
+      var last = all[all.length-1].date;
+      var days = Math.round((new Date(now.getFullYear(),now.getMonth(),now.getDate()) - last)/864e5);
+      return '<div class="ac" style="--c:'+acColor(a)+'"><span class="reg">'+esc(a)+'</span><span class="hrs num">'+fmtH(per)+' h</span>'+
+        '<span class="avg num">Promedio: '+avgTxt+'</span>'+
+        '<span class="meta">'+fmtH(mes)+' h en '+MESES_L[now.getMonth()]+(state.proj && !state.inst ? ' · +'+fmtH(sum(state.proj.filter(function(r){ return r.ac === a && monthKey(r.date) === curK; })))+' h agendadas' : '')+'</span>'+
+        '<span class="meta">Último vuelo: '+fmtDate(last)+(days>0?' ('+days+' d)':' (hoy)')+'</span></div>';
+    }).join("");
+    $("fleet").innerHTML = cards;
+    $("fleet-sub").textContent = "Horas en el período · promedio sobre meses completos";
+  }
+
+  // ---------- Barras horizontales ----------
+  function stackedRank(rows, key, limit, el, showFlights){
+    var acs = aircraftList(), agg = {};
+    rows.forEach(function(r){
+      var k = r[key] || "—"; var o = agg[k] || (agg[k] = {h:0,n:0,by:{}});
+      o.h += r.hours; o.n++; o.by[r.ac] = (o.by[r.ac]||0) + r.hours;
+    });
+    var list = Object.keys(agg).sort(function(a,b){ return agg[b].h - agg[a].h; });
+    if (limit) list = list.slice(0, limit);
+    if (!list.length){ el.innerHTML = '<p class="sub">Sin datos.</p>'; return; }
+    var max = agg[list[0]].h;
+    el.innerHTML = list.map(function(k){
+      var o = agg[k];
+      var segs = acs.filter(function(a){ return o.by[a]; }).map(function(a){
+        return '<b title="'+esc(a)+': '+fmtH(o.by[a])+' h" style="width:'+(o.by[a]/max*100)+'%;background:'+acColor(a)+'"></b>';
+      }).join("");
+      return '<div class="hrow" title="'+esc(k)+' · '+fmtH(o.h)+' h · '+o.n+' vuelos"><span class="n">'+esc(k)+'</span><span class="track">'+segs+'</span><span class="val">'+fmtH(o.h)+(showFlights?' <small>('+o.n+')</small>':'')+'</span></div>';
+    }).join("");
+  }
+  var PURPOSE = {INST:"Instrucción (INST)", ENT:"Entrenamiento (ENT)", EXA:"Examen (EXA)"};
+  function renderPurpose(rows){
+    var mapped = rows.map(function(r){ return Object.assign({}, r, {pl: PURPOSE[r.purpose] || r.purpose}); });
+    stackedRank(mapped, "pl", 6, $("purpose"), true);
+    var dest = rows.filter(function(r){ return r.from === BASE && r.to && r.to !== BASE; })
+      .map(function(r){ return Object.assign({}, r, {dst: r.to}); });
+    stackedRank(dest, "dst", 6, $("dest"), true);
+  }
+
+  // ---------- Últimos vuelos ----------
+  function renderLast(rows){
+    var last = rows.slice(-15).reverse();
+    $("last-sub").textContent = rows.length ? "Los 15 más recientes del filtro" : "";
+    if (!last.length){ $("last").innerHTML = '<p class="sub">Sin vuelos.</p>'; return; }
+    $("last").innerHTML = '<table><thead><tr><th>Fecha</th><th>Avión</th><th>Alumno / Piloto</th><th>Instructor</th><th>Ruta</th><th>Finalidad</th><th class="r">Horas</th></tr></thead><tbody>' +
+      last.map(function(r){
+        return '<tr><td class="num">'+fmtDate(r.date)+'</td><td><span class="acdot" style="background:'+acColor(r.ac)+'"></span>'+esc(r.ac)+'</td><td>'+esc(r.pilot)+'</td><td>'+esc(r.inst)+'</td><td class="num">'+esc((r.from||"—")+" → "+(r.to||"—"))+'</td><td><span class="tag">'+esc(r.purpose)+'</span></td><td class="r">'+fmtH(r.hours)+'</td></tr>';
+      }).join("") + '</tbody></table>';
+  }
+
+  function render(){
+    if (!state.rows) return;
+    renderFilters();
+    var rows = filtered();
+    renderKpis(rows);
+    renderChart(rows);
+    renderFleet(rows);
+    stackedRank(rows, "inst", 10, $("instructors"));
+    stackedRank(rows, "pilot", 12, $("students"));
+    renderPurpose(rows);
+    renderLast(rows);
+    $("month-table").hidden = !state.showTable;
+    $("toggle-table").textContent = state.showTable ? "Ocultar tabla" : "Ver como tabla";
+  }
+
+  // ---------- Eventos ----------
+  document.addEventListener("click", function(e){
+    var p = e.target.closest("[data-p]"), a = e.target.closest("[data-ac]");
+    if (p){ state.period = p.getAttribute("data-p"); try{ localStorage.setItem("gen-tablero", JSON.stringify({period: state.period})); }catch(x){} render(); }
+    if (a){ var k = a.getAttribute("data-ac"); state.ac[k] = !state.ac[k]; render(); }
+  });
+  $("f-inst").addEventListener("change", function(e){ state.inst = e.target.value; render(); });
+  $("toggle-table").addEventListener("click", function(){ state.showTable = !state.showTable; render(); });
+  var rt; window.addEventListener("resize", function(){ clearTimeout(rt); rt = setTimeout(render, 150); });
+
+  // ---------- Carga de datos (Apps Script) ----------
+  function setStatus(kind, text){ $("status").innerHTML = '<span class="dot '+kind+'"></span>' + esc(text); }
+  function showNotice(title, body){
+    var n = $("notice"); n.hidden = false;
+    n.className = "notice"; n.innerHTML = '<b>'+esc(title)+'</b><span>'+body+'</span>';
+  }
+  function hideNotice(){ $("notice").hidden = true; }
+  function skeleton(){
+    $("kpis").innerHTML = [1,2,3,4].map(function(){ return '<div class="kpi"><span class="k">Cargando</span><div class="skel" style="width:60%;height:30px;margin-top:6px"></div><div class="skel" style="width:80%;margin-top:6px"></div></div>'; }).join("");
+    $("chart").innerHTML = '<div class="skel" style="height:260px"></div>';
+  }
+  function errText(err){ return esc((err && (err.message || err)) || "error desconocido"); }
+  function onSheetError(err){
+    if (state.rows){
+      setStatus("warn", "No se pudo actualizar. Se muestran los últimos datos.");
+      return;
+    }
+    setStatus("err", "Sin acceso a los datos");
+    showNotice("No se pudieron cargar los datos", "Detalle: " + errText(err) + ". Revisá la conexión y tocá «Actualizar».");
+    $("kpis").innerHTML = ""; $("chart").innerHTML = "";
+  }
+  function onSheetData(values, ts){
+    if (!values || !values.length){ onSheetError("la pestaña no trae filas"); return; }
+    state.rows = parseRows(values);
+    setStatus("live", "Datos de la planilla · " + new Date(ts || Date.now()).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}) + " · " + fmtInt(state.rows.length) + " vuelos");
+    hideNotice();
+  }
+
+  function setProjNote(html){ var n = $("proj-note"); n.hidden = !html; n.innerHTML = html || ""; }
+  function onAgenda(list){
+    var now = new Date(), perDay = {}, capped = 0, skipped = [];
+    (list || []).forEach(function(cal){
+      if (cal.error){ skipped.push(cal.ac); return; }
+      cal.events.forEach(function(ev){
+        if (ev[2]) return;                       // evento de día completo
+        var st = new Date(ev[0]), en = new Date(ev[1]);
+        if (isNaN(st) || isNaN(en) || st < now) return;
+        var h = (en - st) / 36e5; if (!(h > 0)) return;
+        if (h > EVENT_CAP){ h = EVENT_CAP; capped++; }
+        var day = new Date(st.getFullYear(), st.getMonth(), st.getDate());
+        var key = cal.ac + "|" + day.getTime();
+        var o = perDay[key] || (perDay[key] = { ac: cal.ac, date: day, hours: 0, n: 0 });
+        o.hours += h; o.n++;
+      });
+    });
+    state.proj = Object.keys(perDay).map(function(k){ return perDay[k]; });
+    state.projLoading = false;
+    setProjNote('Agenda leída de Google Calendar: <b>'+fmtH(sum(state.proj))+' h</b> en los próximos '+PROJ_DAYS+' días. Cada turno cuenta lo que dura, con un tope de '+EVENT_CAP+' h por evento'+
+      (capped ? ' ('+capped+(capped===1?' evento recortado':' eventos recortados')+')' : '')+'.'+
+      (skipped.length ? ' <span class="dot warn"></span>Sin acceso al calendario de '+esc(skipped.join(", "))+'.' : ''));
+  }
+
+  // Datos: [fecha, alumno, finalidad, instructor, origen, destino, horas, avión] por fila,
+  // y la agenda por avión. Los arma el Apps Script y los sirve desde su caché.
+  var API = "https://script.google.com/macros/s/AKfycbwlstfIcrjLv-gOTq7sBVe1KI7xtezzsQMR8qNfaWEHoaq18vuCKKrcNmIZL2mdl7jlLA/exec";
+  var STORE = "gen-tablero-datos";
+  function applyDatos(d){
+    if (!d || !d.vuelos) return false;
+    var rows = [[]].concat(d.vuelos.map(function(c){
+      var r = []; r[1] = c[0]; r[2] = c[1]; r[3] = c[2]; r[4] = c[3]; r[5] = c[4]; r[6] = c[5]; r[9] = c[6]; r[13] = c[7]; return r;
+    }));
+    onSheetData(rows, d.ts);
+    onAgenda(d.agenda || []);
+    render();
+    return true;
+  }
+  function fetchDatos(fresco){
+    // sin cookies: no interviene ninguna sesión de Google del navegador
+    return fetch(API + "?d=datos" + (fresco ? "&fresco=1" : "") + "&t=" + Date.now(), { credentials: "omit" })
+      .then(function(r){ if (!r.ok) throw new Error("respuesta " + r.status); return r.json(); })
+      .then(function(j){ if (!j || !j.ok) throw new Error((j && j.error) || "respuesta inválida"); return j.data; });
+  }
+  function loadDatos(fresco){
+    return fetchDatos(fresco).then(function(d){
+      applyDatos(d);
+      try { localStorage.setItem(STORE, JSON.stringify(d)); } catch(e) {}
+    }).catch(onSheetError);
+  }
+
+  skeleton();
+  // 1) datos incrustados por el servidor, 2) los últimos guardados en este navegador, 3) pedirlos
+  var inicial = window.__DATOS__ || null;
+  if (!inicial){ try { inicial = JSON.parse(localStorage.getItem(STORE) || "null"); } catch(e) { inicial = null; } }
+  var mostrado = applyDatos(inicial);
+  if (!window.__DATOS__) loadDatos(false);
+  else if (!mostrado) loadDatos(false);
+  setInterval(function(){ if (!document.hidden) loadDatos(false); }, 300000);
+  $("refresh").addEventListener("click", function(){
+    setStatus("", "Actualizando desde la planilla…");
+    loadDatos(true);
+  });
+})();
+</script>
+
+</body>
+</html>
