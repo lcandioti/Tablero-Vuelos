@@ -261,7 +261,7 @@ td.big{font-weight:600}
   <div class="view" id="view-mant" role="tabpanel" hidden>
     <section class="mkpis" id="mkpis" aria-label="Resumen de mantenimiento"></section>
     <div class="mgrid" id="mgrid"></div>
-    <p class="sub">Los ítems se cargan en la pestaña «Mantenimiento» de la planilla: avión, tipo, ítem, fecha en que se hizo, cada cuántas horas vence y/o fecha de vencimiento. Las horas se descuentan solas con lo volado en la pestaña «Vuelo» desde esa fecha. «Próximo» = quedan 10% de las horas (mínimo 5 h) o 30 días.</p>
+    <p class="sub">Los ítems se cargan en la pestaña «Mantenimiento» de la planilla: avión, tipo, ítem, fecha en que se hizo, cada cuántas horas vence y/o fecha de vencimiento. Las horas se descuentan solas con lo volado en la pestaña «Vuelo» desde esa fecha. En inspecciones y componentes a cada vuelo se le descuentan 0,3 h (se puede cambiar por ítem en la columna «Descuento por vuelo»). «Próximo» = quedan 10% de las horas (mínimo 5 h) o 30 días.</p>
   </div>
 
   <footer id="foot">Datos leídos en vivo de las pestañas «Vuelo» y «Mantenimiento» de la planilla Registro - Génesis Aviación y de los calendarios de cada avión.</footer>
@@ -712,7 +712,9 @@ td.big{font-weight:600}
   }
 
   // ---------- Mantenimiento ----------
-  // Fila de la pestaña Mantenimiento: [Avión, Tipo, Ítem, Fecha realizado, Cada (horas), Vence (fecha), Observaciones]
+  // Fila de la pestaña Mantenimiento: [Avión, Tipo, Ítem, Fecha realizado, Cada (horas), Vence (fecha), Observaciones, Descuento por vuelo]
+  // Descuento por vuelo: horas que se restan a cada vuelo. Por defecto 0,3 en inspecciones y componentes, 0 en el resto.
+  var DESC_DEF = 0.3;
   var ST_RANK = {crit:0, warn:1, none:2, info:3, ok:4};
   var ST_TXT = {crit:"Vencido", warn:"Próximo", ok:"Al día", none:"Faltan datos", info:"Seguimiento"};
   function fmtDays(n){ return Math.abs(n) === 1 ? "1 día" : fmtInt(Math.abs(n)) + " días"; }
@@ -724,9 +726,18 @@ td.big{font-weight:600}
       var ac = clean(m[0]).toUpperCase(), tipo = clean(m[1]), item = clean(m[2]);
       if (!ac && !item) return null;
       var done = parseDate(m[3]), every = parseHours(m[4]), due = parseDate(m[5]), obs = clean(m[6]);
+      var ded = clean(m[7]) === "" ? null : parseHours(m[7]);
+      if (ded == null || !(ded >= 0 && ded < 24)) ded = /inspec|compon/i.test(tipo) ? DESC_DEF : 0;
+      function comp(h){ return Math.max(0, h - ded); }
       if (!(every > 0)) every = null;
       var t = tipo.toLowerCase(), o = { ac: ac || "Sin avión", tipo: tipo || "—", item: item || "—", obs: obs, done: done, every: every, due: due, st: "ok", notes: [] };
-      if (done) o.since = sum((state.rows || []).filter(function(r){ return r.ac === ac && r.date >= done; }));
+      o.ded = ded;
+      if (done){
+        var fl = (state.rows || []).filter(function(r){ return r.ac === ac && r.date >= done; });
+        o.real = sum(fl); o.nfl = fl.length;
+        o.since = fl.reduce(function(s, r){ return s + comp(r.hours); }, 0);
+      }
+      var rateC = (state.rows || []).reduce(function(s, r){ return r.ac === ac && r.date >= rateFrom ? s + comp(r.hours) / 60 : s; }, 0);
       var sts = [];
       if (every){
         if (!done){ sts.push("none"); o.notes.push("Falta cargar la fecha en que se hizo"); }
@@ -734,7 +745,7 @@ td.big{font-weight:600}
           o.left = every - o.since; o.pct = o.since / every;
           var warnAt = Math.max(5, every * 0.1);
           sts.push(o.left < 0 ? "crit" : o.left <= warnAt ? "warn" : "ok");
-          if (o.left > 0 && rate[ac] > 0) o.eta = Math.round(o.left / rate[ac]);
+          if (o.left > 0 && rateC > 0) o.eta = Math.round(o.left / rateC);
         }
       }
       if (due){
@@ -792,14 +803,14 @@ td.big{font-weight:600}
         return '<tr><td class="item"><b>'+esc(o.item)+'</b>'+obs+note+'</td><td><span class="tag">'+esc(o.tipo)+'</span></td>'+
           '<td class="num">'+(o.done ? fmtDate(o.done) : '—')+'</td>'+
           '<td class="r">'+(o.every ? fmtH(o.every)+' h' : '—')+'</td>'+
-          '<td class="r">'+(o.since != null ? fmtH(o.since)+' h' : '—')+'</td>'+
+          '<td class="r">'+(o.since != null ? fmtH(o.since)+' h'+(o.ded ? '<br><span class="sub">'+fmtH(o.real)+' h reales − '+String(o.ded).replace(".", ",")+' × '+o.nfl+(o.nfl === 1 ? ' vuelo' : ' vuelos')+'</span>' : '') : '—')+'</td>'+
           '<td class="r big">'+rest+'</td><td>'+bar+'</td><td class="sub">'+eta+'</td>'+
           '<td class="num">'+venc+'</td>'+
           '<td><span class="st '+o.st+'">'+ST_TXT[o.st]+'</span></td></tr>';
       }).join("");
       var lastF = (state.rows || []).filter(function(r){ return r.ac === a; }).pop();
       return '<section class="panel acpanel" style="--c:'+acColor(a)+'"><div class="phead"><h2>'+esc(a)+'<span class="sub">'+(lastF ? 'último vuelo '+fmtDate(lastF.date) : '')+'</span></h2><span class="st '+worst+'">'+ST_TXT[worst]+'</span></div>'+
-        '<div class="tbl"><table><thead><tr><th>Ítem</th><th>Tipo</th><th>Realizado</th><th class="r">Cada</th><th class="r">Voladas desde</th><th class="r">Restan</th><th>Uso</th><th>Al ritmo actual</th><th>Vence</th><th>Estado</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div></section>';
+        '<div class="tbl"><table><thead><tr><th>Ítem</th><th>Tipo</th><th>Realizado</th><th class="r">Cada</th><th class="r">Computadas desde</th><th class="r">Restan</th><th>Uso</th><th>Al ritmo actual</th><th>Vence</th><th>Estado</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div></section>';
     }).join("");
   }
 
