@@ -292,7 +292,9 @@ td.big{font-weight:600}
 
   var $ = function(id){ return document.getElementById(id); };
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
-  function fmtH(h){ return h.toLocaleString("es-AR",{minimumFractionDigits:1,maximumFractionDigits:1}); }
+  // Horas redondeadas a entero (sin coma). fmtH1 con un decimal solo para horas de un vuelo.
+  function fmtH(h){ return (Math.round(h) || 0).toLocaleString("es-AR"); }
+  function fmtH1(h){ return h.toLocaleString("es-AR",{minimumFractionDigits:1,maximumFractionDigits:1}); }
   function fmtInt(n){ return n.toLocaleString("es-AR"); }
   function monthKey(d){ return d.getFullYear()*100 + d.getMonth(); }
   function monthLabel(k){ return MESES[k%100] + "-" + String(Math.floor(k/100)).slice(2); }
@@ -429,7 +431,7 @@ td.big{font-weight:600}
       kpi("Horas en el período", fmtH(total), "h", fmtInt(n)+" vuelos registrados") +
       kpi("Horas de "+MESES_L[now.getMonth()], fmtH(cur), "h", dTxt + projLine(curK)) +
       kpi("Mes anterior", fmtH(prev), "h", "Total de "+MESES_L[(now.getMonth()+11)%12]) +
-      kpi("Promedio mensual", fmtH(total/nm), "h", fmtH(n ? total/n : 0)+" h por vuelo en promedio");
+      kpi("Promedio mensual", fmtH(total/nm), "h", fmtH1(n ? total/n : 0)+" h por vuelo en promedio");
   }
   function projLine(curK){
     if (state.inst) return '<br><span class="sub">Proyección no disponible con filtro de instructor</span>';
@@ -665,7 +667,7 @@ td.big{font-weight:600}
     if (!last.length){ $("last").innerHTML = '<p class="sub">Sin vuelos.</p>'; return; }
     $("last").innerHTML = '<table><thead><tr><th>Fecha</th><th>Avión</th><th>Alumno / Piloto</th><th>Instructor</th><th>Ruta</th><th>Finalidad</th><th class="r">Horas</th></tr></thead><tbody>' +
       last.map(function(r){
-        return '<tr><td class="num">'+fmtDate(r.date)+'</td><td><span class="acdot" style="background:'+acColor(r.ac)+'"></span>'+esc(r.ac)+'</td><td>'+esc(r.pilot)+'</td><td>'+esc(r.inst)+'</td><td class="num">'+esc((r.from||"—")+" → "+(r.to||"—"))+'</td><td><span class="tag">'+esc(r.purpose)+'</span></td><td class="r">'+fmtH(r.hours)+'</td></tr>';
+        return '<tr><td class="num">'+fmtDate(r.date)+'</td><td><span class="acdot" style="background:'+acColor(r.ac)+'"></span>'+esc(r.ac)+'</td><td>'+esc(r.pilot)+'</td><td>'+esc(r.inst)+'</td><td class="num">'+esc((r.from||"—")+" → "+(r.to||"—"))+'</td><td><span class="tag">'+esc(r.purpose)+'</span></td><td class="r">'+fmtH1(r.hours)+'</td></tr>';
       }).join("") + '</tbody></table>';
   }
 
@@ -793,7 +795,7 @@ td.big{font-weight:600}
       var rowsHtml = list.map(function(o){
         var rest = "—", bar = "", eta = "";
         if (o.every && o.done){
-          rest = o.left < 0 ? '<span class="st crit" style="font-weight:600">'+fmtH(-o.left)+' h pasadas</span>' : fmtH(o.left) + ' h';
+          rest = o.left < 0 ? '<span class="st crit" style="font-weight:600">'+'−'+fmtH(-o.left)+'</span>' : fmtH(o.left);
           var pc = Math.max(0, Math.min(1, o.pct));
           bar = '<span class="bar '+(o.left < 0 ? "crit" : o.st === "warn" ? "warn" : "ok")+'" title="'+Math.round(o.pct*100)+'% usado"><b style="width:'+(pc*100)+'%"></b></span>';
           if (o.eta != null) eta = '≈ '+fmtDays(o.eta);
@@ -804,8 +806,8 @@ td.big{font-weight:600}
         var obs = o.obs ? '<span class="obs">'+esc(o.obs)+'</span>' : '';
         return '<tr><td class="item"><b>'+esc(o.item)+'</b>'+obs+note+'</td><td><span class="tag">'+esc(o.tipo)+'</span></td>'+
           '<td class="num">'+(o.done ? fmtDate(o.done) : '—')+'</td>'+
-          '<td class="r">'+(o.every ? fmtH(o.every)+' h' : '—')+'</td>'+
-          '<td class="r">'+(o.since != null ? fmtH(o.since)+' h'+(o.ded ? '<br><span class="sub">'+fmtH(o.real)+' h reales − '+o.nfl+' × '+String(o.ded).replace(".", ",")+'</span>' : '') : '—')+'</td>'+
+          '<td class="r">'+(o.every ? fmtH(o.every) : '—')+'</td>'+
+          '<td class="r">'+(o.since != null ? fmtH(o.since)+(o.ded ? '<br><span class="sub">'+fmtH(o.real)+' reales − '+o.nfl+' × '+String(o.ded).replace(".", ",")+'</span>' : '') : '—')+'</td>'+
           '<td class="r big">'+rest+'</td><td>'+bar+'</td>'+
           '<td class="num">'+venc+'</td>'+
           '<td><span class="st '+o.st+'">'+ST_TXT[o.st]+'</span></td></tr>';
