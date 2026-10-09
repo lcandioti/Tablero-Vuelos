@@ -158,6 +158,8 @@ footer{color:var(--muted);font-size:.78rem}
 .kpi.crit{border-left:4px solid var(--crit)} .kpi.warn{border-left:4px solid var(--warn)} .kpi.ok{border-left:4px solid var(--ok)} .kpi.none{border-left:4px solid var(--axis)}
 .mgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
 .acpanel{border-left:4px solid var(--c)}
+.mhead{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.mfilter{display:inline-flex;align-items:center;gap:8px}
 .acpanel h2 .sub{font-family:var(--f-body);text-transform:none;letter-spacing:0;font-weight:400;margin-left:8px}
 .st{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:500;white-space:nowrap}
 .st::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
@@ -279,7 +281,7 @@ td.big{font-weight:600}
   // Proyección: un calendario de Google por avión (ids en Code.gs). Cada turno cuenta lo que dura, con un tope de 7 h por evento.
   var PROJ_DAYS = 180, EVENT_CAP = 7;
 
-  var state = { rows: null, period: "12m", from: "", to: "", ac: {}, inst: "", showTable: false, updated: null, proj: null, projErr: null, projLoading: false, mant: [], view: "act" };
+  var state = { rows: null, period: "12m", from: "", to: "", ac: {}, inst: "", showTable: false, updated: null, proj: null, projErr: null, projLoading: false, mant: [], mantTipo: {}, view: "act" };
   try {
     var saved = JSON.parse(localStorage.getItem("gen-tablero") || "{}");
     if (saved.period) state.period = saved.period;
@@ -792,7 +794,13 @@ td.big{font-weight:600}
         return (tRank(x) - tRank(y)) || (x.i - y.i);
       });
       var worst = list.reduce(function(w, o){ return ST_RANK[o.st] < ST_RANK[w] ? o.st : w; }, list[0].st);
-      var rowsHtml = list.map(function(o){
+      // Filtro por tipo de cada avión (desplegable en su encabezado)
+      var tipos = []; list.forEach(function(o){ if (tipos.indexOf(o.tipo) < 0) tipos.push(o.tipo); });
+      var selT = state.mantTipo[a] || ""; if (selT && tipos.indexOf(selT) < 0) selT = "";
+      var shown = selT ? list.filter(function(o){ return o.tipo === selT; }) : list;
+      var selHtml = '<label class="mfilter"><span class="flabel">Tipo</span><select class="sel" data-mtipo="'+esc(a)+'"><option value="">Todos ('+list.length+')</option>'+
+        tipos.map(function(t){ var n = list.filter(function(o){ return o.tipo === t; }).length; return '<option value="'+esc(t)+'"'+(t === selT ? ' selected' : '')+'>'+esc(t)+' ('+n+')</option>'; }).join("")+'</select></label>';
+      var rowsHtml = shown.map(function(o){
         var rest = "—", bar = "", eta = "";
         if (o.every && o.done){
           rest = o.left < 0 ? '<span class="st crit" style="font-weight:600">'+'−'+fmtH(-o.left)+'</span>' : fmtH(o.left);
@@ -813,7 +821,7 @@ td.big{font-weight:600}
           '<td><span class="st '+o.st+'">'+ST_TXT[o.st]+'</span></td></tr>';
       }).join("");
       var lastF = (state.rows || []).filter(function(r){ return r.ac === a; }).pop();
-      return '<section class="panel acpanel" style="--c:'+acColor(a)+'"><div class="phead"><h2>'+esc(a)+'<span class="sub">'+(lastF ? 'último vuelo '+fmtDate(lastF.date) : '')+'</span></h2><span class="st '+worst+'">'+ST_TXT[worst]+'</span></div>'+
+      return '<section class="panel acpanel" style="--c:'+acColor(a)+'"><div class="phead"><h2>'+esc(a)+'<span class="sub">'+(lastF ? 'último vuelo '+fmtDate(lastF.date) : '')+'</span></h2><div class="mhead">'+selHtml+'<span class="st '+worst+'">'+ST_TXT[worst]+'</span></div></div>'+
         '<div class="tbl"><table><thead><tr><th>Ítem</th><th>Tipo</th><th>Realizado</th><th class="r">Cada</th><th class="r">Computadas desde</th><th class="r">Restan</th><th>Uso</th><th>Vence</th><th>Estado</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div></section>';
     }).join("");
   }
@@ -849,6 +857,10 @@ td.big{font-weight:600}
     }
     if (a){ var k = a.getAttribute("data-ac"); state.ac[k] = !state.ac[k]; render(); }
     if (v) setView(v.getAttribute("data-view"), true);
+  });
+  document.addEventListener("change", function(e){
+    var s = e.target.closest && e.target.closest("[data-mtipo]");
+    if (s){ state.mantTipo[s.getAttribute("data-mtipo")] = s.value; renderMant(); }
   });
   function onCustom(){ state.from = $("f-from").value; state.to = $("f-to").value; savePrefs(); render(); }
   $("f-from").addEventListener("change", onCustom);
