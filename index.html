@@ -153,7 +153,9 @@ footer{color:var(--muted);font-size:.78rem}
 .projavg .pa-n{flex-basis:100%;font-size:.78rem;color:var(--muted)}
 
 /* Mantenimiento */
-.mkpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.mkpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.kpi.usd{border-left:4px solid var(--fg2)}
+.usdl{display:block;font-size:.76rem;color:var(--fg2);margin-top:3px;white-space:nowrap}
 @media (max-width:820px){.mkpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .kpi.crit{border-left:4px solid var(--crit)} .kpi.warn{border-left:4px solid var(--warn)} .kpi.ok{border-left:4px solid var(--ok)} .kpi.none{border-left:4px solid var(--axis)}
 .mgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
@@ -170,6 +172,14 @@ footer{color:var(--muted);font-size:.78rem}
 td.item{white-space:normal;min-width:10rem}
 td.item .obs{display:block;font-size:.76rem;color:var(--muted)}
 td.big{font-weight:600}
+/* Controles */
+tr.dim td{color:var(--muted)}
+.notice[hidden]{display:none}
+tr.tot td{border-top:1px solid var(--axis);border-bottom:none}
+.obs{display:block;font-size:.76rem;color:var(--muted)}
+.kpi .v .tarifa{display:block;font-family:var(--f-body);font-size:.85rem;font-weight:500;line-height:1.45}
+.kpi .v.down{color:var(--down)}
+h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-transform:uppercase;letter-spacing:.06em;margin:6px 0 0}
 @media (prefers-reduced-motion:no-preference){.seg{transition:opacity .15s}}
 </style>
 </head>
@@ -192,6 +202,7 @@ td.big{font-weight:600}
   <nav class="tabs" role="tablist" aria-label="Secciones">
     <button class="tab" role="tab" type="button" data-view="act" aria-selected="true" aria-controls="view-act">Actividad</button>
     <button class="tab" role="tab" type="button" data-view="mant" aria-selected="false" aria-controls="view-mant">Mantenimiento<span id="mant-badge"></span></button>
+    <button class="tab" role="tab" type="button" data-view="ctrl" aria-selected="false" aria-controls="view-ctrl">Controles</button>
   </nav>
 
   <div id="notice" hidden></div>
@@ -263,10 +274,32 @@ td.big{font-weight:600}
   <div class="view" id="view-mant" role="tabpanel" hidden>
     <section class="mkpis" id="mkpis" aria-label="Resumen de mantenimiento"></section>
     <div class="mgrid" id="mgrid"></div>
-    <p class="sub">Los ítems se cargan en la pestaña «Mantenimiento» de la planilla: avión, tipo, ítem, fecha en que se hizo, cada cuántas horas vence y/o fecha de vencimiento. Las horas se descuentan solas con lo volado en la pestaña «Vuelo» desde esa fecha. En inspecciones y componentes a cada vuelo se le descuentan 0,3 h (se puede cambiar por ítem en la columna «Descuento por vuelo»). «Próximo» = quedan 10% de las horas (mínimo 5 h) o 30 días.</p>
+    <p class="sub">Los ítems se cargan en la pestaña «Mantenimiento» de la planilla: avión, tipo, ítem, fecha en que se hizo, cada cuántas horas vence y/o fecha de vencimiento. Las horas se descuentan solas con lo volado en la pestaña «Vuelo» desde esa fecha. En inspecciones y componentes a cada vuelo se le descuentan 0,3 h (se puede cambiar por ítem en la columna «Descuento por vuelo»). «Próximo» = quedan 10% de las horas (mínimo 5 h) o 30 días. Previsión USD = costo de reemplazo ÷ horas de vida útil × horas computadas desde el último cambio.</p>
   </div>
 
-  <footer id="foot">Datos leídos en vivo de las pestañas «Vuelo» y «Mantenimiento» de la planilla Registro - Génesis Aviación y de los calendarios de cada avión.</footer>
+  <div class="view" id="view-ctrl" role="tabpanel" hidden>
+    <div class="notice" id="c-nocfg" hidden><b>Falta la pestaña «Tarifas»</b><span>Los controles usan las tarifas, el % de instructor y los viáticos de la pestaña «Tarifas» de la planilla.</span></div>
+    <div class="view" id="c-body">
+      <section class="panel" aria-labelledby="h-cinst">
+        <div class="phead"><h2 id="h-cinst">Previsión honorarios instructores</h2><div class="chips" id="c-mes"></div></div>
+        <div class="kpis" id="c-inst-kpis"></div>
+        <div class="tbl" id="c-inst"></div>
+      </section>
+      <section class="panel" aria-labelledby="h-cpag">
+        <div class="phead"><h2 id="h-cpag">Pagos de alumnos</h2>
+          <div class="mhead"><label class="mfilter"><span class="flabel">Mostrar</span>
+            <select class="sel" id="c-ver"><option value="deben">Deben</option><option value="favor">Saldo a favor</option><option value="todos">Todos</option></select></label></div>
+        </div>
+        <div class="kpis" id="c-pag-kpis"></div>
+        <div class="tbl" id="c-alumnos"></div>
+        <h3 class="csub">Vuelos sin pago registrado</h3>
+        <div class="tbl" id="c-pend"></div>
+      </section>
+      <p class="sub" id="c-nota"></p>
+    </div>
+  </div>
+
+  <footer id="foot">Datos leídos en vivo de las pestañas «Vuelo», «Simulador», «Mantenimiento», «Tarifas» e «Ingresos» (solo horas) de la planilla Registro - Génesis Aviación y de los calendarios de cada avión.</footer>
 </div>
 <div class="tip" id="tip" hidden></div>
 
@@ -721,6 +754,15 @@ td.big{font-weight:600}
   var DESC_DEF = 0.3;
   var ST_RANK = {crit:0, warn:1, none:2, info:3, ok:4};
   var ST_TXT = {crit:"Vencido", warn:"Próximo", ok:"Al día", none:"Faltan datos", info:"Seguimiento"};
+  function fmtUSD(v){ return "US$ " + (Math.round(v) || 0).toLocaleString("es-AR"); }
+  // Montos como los muestra la planilla: "1.500", "1500", "1.500,50", "US$ 2.000".
+  function parseMoney(s){
+    var t = String(s == null ? "" : s).replace(/[^\d.,-]/g, "");
+    if (!t) return null;
+    if (t.indexOf(",") >= 0) t = t.replace(/\./g, "").replace(",", ".");
+    else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
+    var v = parseFloat(t); return isNaN(v) || v <= 0 ? null : v;
+  }
   function fmtDays(n){ return Math.abs(n) === 1 ? "1 día" : fmtInt(Math.abs(n)) + " días"; }
   function mantItems(){
     var today = new Date(); today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -736,6 +778,7 @@ td.big{font-weight:600}
       if (!(every > 0)) every = null;
       var t = tipo.toLowerCase(), o = { ac: ac || "Sin avión", tipo: tipo || "—", item: item || "—", obs: obs, done: done, every: every, due: due, st: "ok", notes: [] };
       o.ded = ded;
+      o.cost = parseMoney(m[8]);
       if (done){
         var fl = (state.rows || []).filter(function(r){ return r.ac === ac && r.date >= done; });
         o.real = sum(fl); o.nfl = fl.length;
@@ -761,6 +804,8 @@ td.big{font-weight:600}
         else if (/venc|p[oó]liza|seguro|anual/.test(t + " " + item.toLowerCase())){ sts.push("none"); o.notes.push("Falta cargar la fecha de vencimiento"); }
         else { sts.push("none"); o.notes.push(done ? "Falta cargar cada cuántas horas" : "Falta cargar fecha y horas"); }
       }
+      // Previsión USD: costo de reemplazo repartido por hora de vida útil, sobre las horas computadas desde el cambio.
+      if (o.cost && every){ o.usdH = o.cost / every; if (o.since != null) o.prov = o.since * o.usdH; }
       o.i = idx;
       o.st = sts.sort(function(a,b){ return ST_RANK[a] - ST_RANK[b]; })[0];
       return o;
@@ -779,7 +824,13 @@ td.big{font-weight:600}
       mk("crit", "Vencidos", cnt.crit, "Pasados de horas o de fecha") +
       mk("warn", "Próximos", cnt.warn, "≤10% de horas (mín. 5 h) o ≤30 días") +
       mk("ok", "Al día", cnt.ok + cnt.info, cnt.info ? cnt.info + (cnt.info === 1 ? " reparación" : " reparaciones") + " en seguimiento" : "Con margen") +
-      mk("none", "Faltan datos", cnt.none, "Completar en la planilla");
+      mk("none", "Faltan datos", cnt.none, "Completar en la planilla") +
+      (function(){
+        var wc = items.filter(function(o){ return o.usdH; });
+        var prov = wc.reduce(function(s, o){ return s + (o.prov || 0); }, 0), tot = wc.reduce(function(s, o){ return s + o.cost; }, 0);
+        var hr = wc.reduce(function(s, o){ return s + o.usdH; }, 0);
+        return mk("usd", "Previsión USD", wc.length ? fmtUSD(prov) : "—", wc.length ? "de " + fmtUSD(tot) + " en reemplazos · " + fmtUSD(hr) + " por hora computada" : "Cargá el costo en la columna «Costo reemplazo (USD)»");
+      })();
     if (!items.length){
       $("mgrid").innerHTML = '<div class="notice"><b>Todavía no hay ítems de mantenimiento</b><span>Cargalos en la pestaña «Mantenimiento» de la planilla y tocá «Actualizar».</span></div>';
       return;
@@ -816,14 +867,225 @@ td.big{font-weight:600}
           '<td class="num">'+(o.done ? fmtDate(o.done) : '—')+'</td>'+
           '<td class="r">'+(o.every ? fmtH(o.every) : '—')+'</td>'+
           '<td class="r">'+(o.since != null ? fmtH(o.since)+(o.ded ? '<br><span class="sub">'+fmtH(o.real)+' reales − '+o.nfl+' × '+String(o.ded).replace(".", ",")+'</span>' : '') : '—')+'</td>'+
-          '<td class="r big">'+rest+'</td><td>'+bar+'</td>'+
+          '<td class="r big">'+rest+'</td><td>'+bar+(o.usdH ? '<span class="usdl" title="'+fmtUSD(o.usdH)+' por hora · costo '+fmtUSD(o.cost)+'">'+(o.prov != null ? fmtUSD(o.prov) : 'US$ —')+' de '+fmtUSD(o.cost).replace('US$ ', '')+'</span>' : '')+'</td>'+
           '<td class="num">'+venc+'</td>'+
           '<td><span class="st '+o.st+'">'+ST_TXT[o.st]+'</span></td></tr>';
       }).join("");
       var lastF = (state.rows || []).filter(function(r){ return r.ac === a; }).pop();
-      return '<section class="panel acpanel" style="--c:'+acColor(a)+'"><div class="phead"><h2>'+esc(a)+'<span class="sub">'+(lastF ? 'último vuelo '+fmtDate(lastF.date) : '')+'</span></h2><div class="mhead">'+selHtml+'<span class="st '+worst+'">'+ST_TXT[worst]+'</span></div></div>'+
-        '<div class="tbl"><table><thead><tr><th>Ítem</th><th>Tipo</th><th>Realizado</th><th class="r">Cada</th><th class="r">Computadas desde</th><th class="r">Restan</th><th>Uso</th><th>Vence</th><th>Estado</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div></section>';
+      var acC = list.filter(function(o){ return o.usdH; });
+      var acTxt = acC.length ? ' · previsión '+fmtUSD(acC.reduce(function(s, o){ return s + (o.prov || 0); }, 0))+' · '+fmtUSD(acC.reduce(function(s, o){ return s + o.usdH; }, 0))+'/h' : '';
+      return '<section class="panel acpanel" style="--c:'+acColor(a)+'"><div class="phead"><h2>'+esc(a)+'<span class="sub">'+(lastF ? 'último vuelo '+fmtDate(lastF.date) : '')+acTxt+'</span></h2><div class="mhead">'+selHtml+'<span class="st '+worst+'">'+ST_TXT[worst]+'</span></div></div>'+
+        '<div class="tbl"><table><thead><tr><th>Ítem</th><th>Tipo</th><th>Realizado</th><th class="r">Cada</th><th class="r">Computadas desde</th><th class="r">Restan</th><th>Uso / previsión</th><th>Vence</th><th>Estado</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div></section>';
     }).join("");
+  }
+
+  // ---------- Controles: honorarios de instructores y pagos de alumnos ----------
+  // Tarifas, % y viáticos salen de la pestaña «Tarifas» de la planilla (d.tar).
+  // Sesiones de simulador (d.sim): [fecha, alumno, finalidad, instructor, horas]
+  // Pagos (d.pagos, solo horas, sin montos): [fecha, alumno, concepto, avión, horas abonadas]
+  function nrm(s){
+    return String(s || "").replace(/\(.*?\)/g, " ").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+  }
+  function lev1(a, b){
+    if (Math.abs(a.length - b.length) > 1) return false;
+    var i = 0, j = 0, d = 0;
+    while (i < a.length && j < b.length){
+      if (a[i] === b[j]){ i++; j++; continue; }
+      if (++d > 1) return false;
+      if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+    }
+    return d + (a.length - i) + (b.length - j) <= 1;
+  }
+  // Une variantes de un mismo nombre (Marazzo / Marazza). Devuelve clave canónica por nombre.
+  function nameIndex(names){
+    var keys = {}; names.forEach(function(n){ var k = nrm(n); if (k) keys[k] = (keys[k] || 0) + 1; });
+    var ks = Object.keys(keys).sort(function(a,b){ return a.length - b.length || keys[b] - keys[a]; }), canon = {};
+    ks.forEach(function(k){
+      if (canon[k]) return; canon[k] = k;
+      ks.forEach(function(o){ if (!canon[o] && k.length >= 8 && o.split(" ")[0] === k.split(" ")[0] && lev1(k, o)) canon[o] = k; });
+    });
+    return function(n){ var k = nrm(n); return k ? (canon[k] || k) : ""; };
+  }
+  function money(v){ return "$ " + (Math.round(v) || 0).toLocaleString("es-AR"); }
+  function hrs1(v){ return (Math.round(v * 10) / 10).toLocaleString("es-AR", {minimumFractionDigits:1, maximumFractionDigits:1}); }
+  function ctrlConfig(){
+    var t = state.tar; if (!t || !t.aviones) return null;
+    var grupos = [], byMat = {}, sim = null;
+    t.aviones.forEach(function(a){
+      var pct = Number(a[3]) || 0; if (pct > 1) pct = pct / 100;
+      var g = { nombre: a[0], tarifa: Number(a[2]) || 0, pct: pct, mats: String(a[1]).toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean) };
+      g.isSim = /^sim/i.test(a[0]) || g.mats.indexOf("SIM") >= 0;
+      grupos.push(g); g.mats.forEach(function(m){ byMat[m] = g; });
+      if (g.isSim) sim = g;
+    });
+    var inst = {};
+    (t.inst || []).forEach(function(r){
+      inst[nrm(r[0])] = { nombre: r[0], cobra: !/^no/i.test(String(r[1] || "")), hAv: Number(r[2]) || 0, hSim: Number(r[3]) || 0, viat: Number(r[4]) || 0 };
+    });
+    var excl = {}; (t.excl || []).forEach(function(n){ var k = nrm(n); if (k) excl[k] = 1; });
+    return { grupos: grupos, byMat: byMat, sim: sim, inst: inst, excl: excl, desde: parseDate(t.desde) || new Date(2024, 9, 10) };
+  }
+  function grupoDe(cfg, avion, concepto){
+    var a = String(avion || "").trim().toUpperCase();
+    if (/^sim/i.test(String(concepto || "")) || /^SIM/.test(a)) return cfg.sim;
+    return cfg.byMat[a] || null;
+  }
+
+  // ----- Instructores -----
+  function instructorMes(cfg, mk){
+    var key = nameIndex(Object.keys(cfg.inst).map(function(k){ return cfg.inst[k].nombre; })
+      .concat(state.rows.map(function(r){ return r.inst; })).concat((state.sim || []).map(function(s){ return s[3]; })));
+    var instCfg = {}; Object.keys(cfg.inst).forEach(function(k){ instCfg[key(cfg.inst[k].nombre)] = cfg.inst[k]; });
+    var P = {};
+    function get(n){
+      var k = key(n); if (!k || /^(n a|na|sin instructor|no)$/.test(k)) return null;
+      var p = P[k] || (P[k] = { k: k, nombre: (instCfg[k] && instCfg[k].nombre) || clean(n), cfg: instCfg[k] || null, h: {}, hon: 0, dias: {}, vuelos: 0 });
+      return p;
+    }
+    state.rows.forEach(function(r){
+      if (monthKey(r.date) !== mk) return;
+      var p = get(r.inst); if (!p) return;
+      var g = cfg.byMat[r.ac]; if (!g) return;
+      var rate = p.cfg && p.cfg.hAv ? p.cfg.hAv : g.tarifa * g.pct;
+      p.h[g.nombre] = (p.h[g.nombre] || 0) + r.hours;
+      p.hon += r.hours * rate; p.vuelos++;
+      p.dias[r.date.getTime()] = 1;
+    });
+    (state.sim || []).forEach(function(s){
+      var d = parseDate(s[0]); if (!d || monthKey(d) !== mk) return;
+      var h = parseHours(s[4]); if (!(h > 0 && h <= 12)) return;
+      var p = get(s[3]); if (!p || !cfg.sim) return;
+      var rate = p.cfg && p.cfg.hSim ? p.cfg.hSim : cfg.sim.tarifa * cfg.sim.pct;
+      p.h[cfg.sim.nombre] = (p.h[cfg.sim.nombre] || 0) + h;
+      p.hon += h * rate; p.vuelos++;
+    });
+    return Object.keys(P).map(function(k){
+      var p = P[k], dias = Object.keys(p.dias).length, cobra = !p.cfg || p.cfg.cobra;
+      var viat = p.cfg ? dias * p.cfg.viat : 0;
+      return { nombre: p.nombre, h: p.h, dias: dias, hon: cobra ? p.hon : 0, viat: cobra ? viat : 0, cobra: cobra, enTabla: !!p.cfg, vuelos: p.vuelos };
+    }).sort(function(a,b){ return (b.hon + b.viat) - (a.hon + a.viat) || a.nombre.localeCompare(b.nombre); });
+  }
+  function renderInstructores(cfg){
+    // Solo el mes en curso: cada mes se liquida distinto
+    var now = new Date(), opts = [monthKey(now)];
+    state.ctrlMes = opts[0];
+    $("c-mes").innerHTML = '<span class="sub">'+MESES_L[now.getMonth()]+' '+now.getFullYear()+' · vuelos al '+fmtDate(now)+'</span>';
+    var list = instructorMes(cfg, state.ctrlMes), grupos = cfg.grupos;
+    var tot = { hon: 0, viat: 0, h: 0, dias: 0 };
+    list.forEach(function(p){ tot.hon += p.hon; tot.viat += p.viat; tot.dias += p.dias; Object.keys(p.h).forEach(function(g){ tot.h += p.h[g]; }); });
+    var esActual = state.ctrlMes === opts[0];
+    function k(t, v, d){ return '<div class="kpi"><span class="k">'+esc(t)+'</span><span class="v num">'+v+'</span><span class="d">'+d+'</span></div>'; }
+    $("c-inst-kpis").innerHTML =
+      k(esActual ? "A previsionar este mes" : "Total de " + MESES_L[state.ctrlMes%100], money(tot.hon + tot.viat), esActual ? "Acumulado al " + fmtDate(now) + " · se paga a fin de mes" : "Honorarios más viáticos") +
+      k("Honorarios por horas", money(tot.hon), hrs1(tot.h) + " h instruidas") +
+      k("Viáticos", money(tot.viat), "Por día de vuelo, según la pestaña Tarifas") +
+      k("Instructores", fmtInt(list.filter(function(p){ return p.cobra; }).length), list.some(function(p){ return !p.cobra; }) ? fmtInt(list.filter(function(p){ return !p.cobra; }).length) + " con vuelos que no cobran" : "con vuelos en el mes");
+    if (!list.length){ $("c-inst").innerHTML = '<p class="sub">No hay vuelos con instructor en este mes.</p>'; return; }
+    $("c-inst").innerHTML = '<table><thead><tr><th>Instructor</th>' + grupos.map(function(g){ return '<th class="r">'+esc(g.nombre)+' (h)</th>'; }).join("") +
+      '<th class="r">Días de vuelo</th><th class="r">Honorarios</th><th class="r">Viáticos</th><th class="r">Total</th></tr></thead><tbody>' +
+      list.map(function(p){
+        var note = !p.cobra ? ' <span class="tag">no cobra</span>' : !p.enTabla ? ' <span class="tag" title="No está en la pestaña Tarifas: se calcula al % de cada avión, sin viático">no está en Tarifas</span>' : '';
+        return '<tr'+(p.cobra ? '' : ' class="dim"')+'><td>'+esc(p.nombre)+note+'</td>' + grupos.map(function(g){ return '<td class="r">'+(p.h[g.nombre] ? hrs1(p.h[g.nombre]) : '—')+'</td>'; }).join("") +
+          '<td class="r">'+(p.dias || '—')+'</td><td class="r">'+money(p.hon)+'</td><td class="r">'+(p.viat ? money(p.viat) : '—')+'</td><td class="r"><b>'+money(p.hon + p.viat)+'</b></td></tr>';
+      }).join("") +
+      '<tr class="tot"><td><b>Total</b></td>' + grupos.map(function(g){ var s = list.reduce(function(t, p){ return t + (p.h[g.nombre] || 0); }, 0); return '<td class="r"><b>'+(s ? hrs1(s) : '—')+'</b></td>'; }).join("") +
+      '<td class="r"></td><td class="r"><b>'+money(tot.hon)+'</b></td><td class="r"><b>'+money(tot.viat)+'</b></td><td class="r"><b>'+money(tot.hon + tot.viat)+'</b></td></tr></tbody></table>';
+  }
+
+  // ----- Pagos de alumnos -----
+  // Las horas pagadas de cada alumno (por tipo de avión) se van usando contra sus vuelos en orden de fecha.
+  function pagosAlumnos(cfg){
+    var instKeys = {}; Object.keys(cfg.inst).forEach(function(k){ instKeys[k] = 1; }); Object.keys(cfg.excl).forEach(function(k){ instKeys[k] = 1; });
+    var all = [];
+    state.rows.forEach(function(r){ all.push(r.pilot); });
+    (state.sim || []).forEach(function(s){ all.push(s[1]); });
+    (state.pagos || []).forEach(function(p){ all.push(p[1]); });
+    var key = nameIndex(all), P = {};
+    function get(n){
+      var k = key(n); if (!k || instKeys[k] || /^(sin nombre|n a|na)$/.test(k)) return null;
+      var p = P[k] || (P[k] = { k: k, nombres: {}, g: {}, ultVuelo: null, ultPago: null });
+      p.nombres[clean(n)] = (p.nombres[clean(n)] || 0) + 1;
+      return p;
+    }
+    function G(p, g){ return p.g[g.nombre] || (p.g[g.nombre] = { pag: 0, vuelos: [], grupo: g }); }
+    state.rows.forEach(function(r){
+      if (r.date < cfg.desde) return;
+      var g = cfg.byMat[r.ac]; if (!g) return;
+      var p = get(r.pilot); if (!p) return;
+      G(p, g).vuelos.push({ date: r.date, h: r.hours, ac: r.ac, inst: r.inst });
+      if (!p.ultVuelo || r.date > p.ultVuelo) p.ultVuelo = r.date;
+    });
+    (state.sim || []).forEach(function(s){
+      var d = parseDate(s[0]); if (!d || d < cfg.desde || !cfg.sim) return;
+      var h = parseHours(s[4]); if (!(h > 0 && h <= 12)) return;
+      var p = get(s[1]); if (!p) return;
+      G(p, cfg.sim).vuelos.push({ date: d, h: h, ac: "SIM", inst: clean(s[3]) });
+      if (!p.ultVuelo || d > p.ultVuelo) p.ultVuelo = d;
+    });
+    (state.pagos || []).forEach(function(x){
+      var d = parseDate(x[0]); if (!d || d < cfg.desde) return;
+      if (/lts|litro/i.test(String(x[4]))) return;
+      var h = parseHours(x[4]); if (!(h > 0) || h > 150) return;
+      var g = grupoDe(cfg, x[3], x[2]); if (!g) return;
+      var p = get(x[1]); if (!p) return;
+      G(p, g).pag += h;
+      if (!p.ultPago || d > p.ultPago) p.ultPago = d;
+    });
+    var pend = [];
+    var alumnos = Object.keys(P).map(function(k){
+      var p = P[k], valor = 0, sal = {};
+      Object.keys(p.g).forEach(function(gn){
+        var x = p.g[gn], resto = x.pag;
+        x.vuelos.sort(function(a,b){ return a.date - b.date; });
+        x.vuelos.forEach(function(v){
+          var cubre = Math.min(v.h, Math.max(0, resto)); resto -= v.h;
+          var falta = Math.round((v.h - cubre) * 10) / 10;
+          if (falta > 0) pend.push({ date: v.date, alumno: p, ac: v.ac, grupo: x.grupo, h: falta, total: v.h, inst: v.inst });
+        });
+        var s = Math.round((x.pag - x.vuelos.reduce(function(t, v){ return t + v.h; }, 0)) * 10) / 10;
+        sal[gn] = s; valor += s * x.grupo.tarifa;
+      });
+      var ns = Object.keys(p.nombres).sort(function(a,b){ return p.nombres[b] - p.nombres[a]; });
+      p.nombre = ns[0];
+      return { nombre: ns[0], otros: ns.slice(1).filter(function(n){ return nrm(n) !== nrm(ns[0]); }), sal: sal, valor: valor, ultVuelo: p.ultVuelo, ultPago: p.ultPago };
+    });
+    pend.sort(function(a,b){ return b.date - a.date; });
+    return { alumnos: alumnos, pend: pend };
+  }
+  function renderPagos(cfg){
+    var r = pagosAlumnos(cfg), grupos = cfg.grupos;
+    var deben = r.alumnos.filter(function(a){ return a.valor < -1; }), favor = r.alumnos.filter(function(a){ return a.valor > 1; });
+    var debe$ = -deben.reduce(function(t, a){ return t + a.valor; }, 0), favor$ = favor.reduce(function(t, a){ return t + a.valor; }, 0);
+    var hace30 = new Date(Date.now() - 30 * 864e5), p30 = r.pend.filter(function(v){ return v.date >= hace30; });
+    function k(t, v, d, cls){ return '<div class="kpi"><span class="k">'+esc(t)+'</span><span class="v num'+(cls?' '+cls:'')+'">'+v+'</span><span class="d">'+d+'</span></div>'; }
+    $("c-pag-kpis").innerHTML =
+      k("Pendiente de cobro", money(debe$), fmtInt(deben.length) + " alumnos con vuelos sin pago registrado desde el " + fmtDate(cfg.desde), "down") +
+      k("Saldo a favor de alumnos", money(favor$), fmtInt(favor.length) + " alumnos con horas pagadas sin volar") +
+      k("Vuelos pendientes (30 días)", fmtInt(p30.length), hrs1(p30.reduce(function(t, v){ return t + v.h; }, 0)) + " h sin pago registrado") +
+      k("Tarifas usadas", grupos.map(function(g){ return '<span class="tarifa">'+esc(g.nombre)+' '+money(g.tarifa)+'</span>'; }).join(""), "Por hora · se cambian en la pestaña Tarifas");
+    var ver = state.ctrlVer || "deben";
+    var lista = ver === "deben" ? deben.sort(function(a,b){ return a.valor - b.valor; }) : ver === "favor" ? favor.sort(function(a,b){ return b.valor - a.valor; }) : r.alumnos.slice().sort(function(a,b){ return a.valor - b.valor; });
+    var show = state.ctrlAll ? lista : lista.slice(0, 25);
+    $("c-alumnos").innerHTML = lista.length ? '<table><thead><tr><th>Alumno</th>' + grupos.map(function(g){ return '<th class="r">'+esc(g.nombre)+' (h)</th>'; }).join("") +
+      '<th class="r">Saldo en $</th><th>Último vuelo</th><th>Último pago</th></tr></thead><tbody>' +
+      show.map(function(a){
+        return '<tr><td>'+esc(a.nombre)+(a.otros.length ? '<span class="obs">También: '+esc(a.otros.join(", "))+'</span>' : '')+'</td>' + grupos.map(function(g){ var s = a.sal[g.nombre]; return '<td class="r '+(s > 0 ? 'up' : s < 0 ? 'down' : '')+'">'+(s ? (s > 0 ? '+' : '−') + hrs1(Math.abs(s)) : '—')+'</td>'; }).join("") +
+          '<td class="r '+(a.valor >= 0 ? 'up' : 'down')+'"><b>'+(a.valor < 0 ? '−' : '+')+money(Math.abs(a.valor))+'</b></td><td class="num">'+(a.ultVuelo ? fmtDate(a.ultVuelo) : '—')+'</td><td class="num">'+(a.ultPago ? fmtDate(a.ultPago) : '—')+'</td></tr>';
+      }).join("") + '</tbody></table>' + (lista.length > 25 ? '<p style="margin:8px 0 0"><button class="link" type="button" id="c-more">'+(state.ctrlAll ? 'Ver solo los primeros 25' : 'Ver todos ('+lista.length+')')+'</button></p>' : '') : '<p class="sub">Nadie en esta categoría.</p>';
+    var pv = r.pend.slice(0, 40);
+    $("c-pend").innerHTML = pv.length ? '<table><thead><tr><th>Fecha</th><th>Alumno</th><th>Avión</th><th>Instructor</th><th class="r">Horas sin pago</th><th class="r">Valor</th></tr></thead><tbody>' +
+      pv.map(function(v){ return '<tr><td class="num">'+fmtDate(v.date)+'</td><td>'+esc(v.alumno.nombre)+'</td><td>'+(v.ac === "SIM" ? 'Simulador' : '<span class="acdot" style="background:'+acColor(v.ac)+'"></span>'+esc(v.ac))+'</td><td>'+esc(v.inst || '—')+'</td><td class="r">'+hrs1(v.h)+(v.h < v.total ? ' <span class="sub">de '+hrs1(v.total)+'</span>' : '')+'</td><td class="r">'+money(v.h * v.grupo.tarifa)+'</td></tr>'; }).join("") +
+      '</tbody></table>' : '<p class="sub">No hay vuelos sin pago registrado.</p>';
+  }
+  function renderControles(){
+    var cfg = ctrlConfig();
+    $("c-nocfg").hidden = !!cfg;
+    $("c-body").hidden = !cfg;
+    if (!cfg || !state.rows) return;
+    renderInstructores(cfg);
+    renderPagos(cfg);
+    $("c-nota").innerHTML = 'Pagos: las horas abonadas en «Ingresos» se usan contra los vuelos de cada alumno en orden de fecha, por tipo de avión, desde el '+fmtDate(cfg.desde)+'. «Saldo en $» suma los tipos de avión a la tarifa actual, así que si alguien pagó un avión y voló otro se compensa. No se controla el pago de los instructores ni de las personas de la lista «No controlar pagos de» de la pestaña Tarifas. Honorarios: horas del mes × (% de la tarifa del avión, o el valor fijo del instructor) + viático por cada día con vuelos en avión.';
   }
 
   function render(){
@@ -839,6 +1101,7 @@ td.big{font-weight:600}
     renderLast(rows);
     renderProjAvg();
     renderMant();
+    renderControles();
     $("month-table").hidden = !state.showTable;
     $("toggle-table").textContent = state.showTable ? "Ocultar tabla" : "Ver como tabla";
   }
@@ -866,15 +1129,24 @@ td.big{font-weight:600}
   $("f-from").addEventListener("change", onCustom);
   $("f-to").addEventListener("change", onCustom);
   function setView(v, push){
-    state.view = v === "mant" ? "mant" : "act";
+    state.view = v === "mant" || v === "ctrl" ? v : "act";
     $("view-act").hidden = state.view !== "act";
     $("view-mant").hidden = state.view !== "mant";
+    $("view-ctrl").hidden = state.view !== "ctrl";
     document.querySelectorAll("[data-view]").forEach(function(b){ b.setAttribute("aria-selected", String(b.getAttribute("data-view") === state.view)); });
-    if (push){ try { history.replaceState(null, "", state.view === "mant" ? "#mantenimiento" : location.pathname + location.search); } catch(x) { location.hash = state.view === "mant" ? "mantenimiento" : ""; } }
+    var hash = state.view === "mant" ? "#mantenimiento" : state.view === "ctrl" ? "#controles" : "";
+    if (push){ try { history.replaceState(null, "", hash || location.pathname + location.search); } catch(x) { location.hash = hash; } }
     if (state.view === "act") render();
   }
-  window.addEventListener("hashchange", function(){ setView(/mant/i.test(location.hash) ? "mant" : "act", false); });
-  setView(/mant/i.test(location.hash) ? "mant" : "act", false);
+  function viewFromHash(){ return /mant/i.test(location.hash) ? "mant" : /control/i.test(location.hash) ? "ctrl" : "act"; }
+  window.addEventListener("hashchange", function(){ setView(viewFromHash(), false); });
+  setView(viewFromHash(), false);
+  document.addEventListener("click", function(e){
+    var m = e.target.closest && e.target.closest("[data-cmes]");
+    if (m){ state.ctrlMes = +m.getAttribute("data-cmes"); renderControles(); }
+    if (e.target.id === "c-more"){ state.ctrlAll = !state.ctrlAll; renderControles(); }
+  });
+  $("c-ver").addEventListener("change", function(e){ state.ctrlVer = e.target.value; state.ctrlAll = false; renderControles(); });
   $("f-inst").addEventListener("change", function(e){ state.inst = e.target.value; render(); });
   $("toggle-table").addEventListener("click", function(){ state.showTable = !state.showTable; render(); });
   var rt; window.addEventListener("resize", function(){ clearTimeout(rt); rt = setTimeout(render, 150); });
@@ -941,6 +1213,7 @@ td.big{font-weight:600}
       var r = []; r[1] = c[0]; r[2] = c[1]; r[3] = c[2]; r[4] = c[3]; r[5] = c[4]; r[6] = c[5]; r[9] = c[6]; r[13] = c[7]; return r;
     }));
     state.mant = d.mant || [];
+    state.tar = d.tar || null; state.sim = d.sim || []; state.pagos = d.pagos || [];
     onSheetData(rows, d.ts);
     onAgenda(d.agenda || []);
     render();
