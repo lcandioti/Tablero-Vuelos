@@ -940,7 +940,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     var P = {};
     function get(n){
       var k = key(n); if (!k || /^(n a|na|sin instructor|no)$/.test(k)) return null;
-      var p = P[k] || (P[k] = { k: k, nombre: (instCfg[k] && instCfg[k].nombre) || clean(n), cfg: instCfg[k] || null, h: {}, hon: 0, dias: {}, vuelos: 0 });
+      var p = P[k] || (P[k] = { k: k, nombre: (instCfg[k] && instCfg[k].nombre) || clean(n), cfg: instCfg[k] || null, h: {}, m: {}, hon: 0, dias: {}, vuelos: 0 });
       return p;
     }
     state.rows.forEach(function(r){
@@ -949,6 +949,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
       var g = cfg.byMat[r.ac]; if (!g) return;
       var rate = p.cfg && p.cfg.hAv ? p.cfg.hAv : g.tarifa * g.pct;
       p.h[g.nombre] = (p.h[g.nombre] || 0) + r.hours;
+      p.m[g.nombre] = (p.m[g.nombre] || 0) + r.hours * rate;
       p.hon += r.hours * rate; p.vuelos++;
       p.dias[r.date.getTime()] = 1;
     });
@@ -958,12 +959,13 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
       var p = get(s[3]); if (!p || !cfg.sim) return;
       var rate = p.cfg && p.cfg.hSim ? p.cfg.hSim : cfg.sim.tarifa * cfg.sim.pct;
       p.h[cfg.sim.nombre] = (p.h[cfg.sim.nombre] || 0) + h;
+      p.m[cfg.sim.nombre] = (p.m[cfg.sim.nombre] || 0) + h * rate;
       p.hon += h * rate; p.vuelos++;
     });
     return Object.keys(P).map(function(k){
       var p = P[k], dias = Object.keys(p.dias).length, cobra = !p.cfg || p.cfg.cobra;
       var viat = p.cfg ? dias * p.cfg.viat : 0;
-      return { nombre: p.nombre, h: p.h, dias: dias, hon: cobra ? p.hon : 0, viat: cobra ? viat : 0, cobra: cobra, enTabla: !!p.cfg, vuelos: p.vuelos };
+      return { nombre: p.nombre, h: p.h, m: cobra ? p.m : {}, dias: dias, hon: cobra ? p.hon : 0, viat: cobra ? viat : 0, cobra: cobra, enTabla: !!p.cfg, vuelos: p.vuelos };
     }).sort(function(a,b){ return (b.hon + b.viat) - (a.hon + a.viat) || a.nombre.localeCompare(b.nombre); });
   }
   function renderInstructores(cfg){
@@ -982,14 +984,14 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
       k("Viáticos", money(tot.viat), "Por día de vuelo, según la pestaña Tarifas") +
       k("Instructores", fmtInt(list.filter(function(p){ return p.cobra; }).length), list.some(function(p){ return !p.cobra; }) ? fmtInt(list.filter(function(p){ return !p.cobra; }).length) + " con vuelos que no cobran" : "con vuelos en el mes");
     if (!list.length){ $("c-inst").innerHTML = '<p class="sub">No hay vuelos con instructor en este mes.</p>'; return; }
-    $("c-inst").innerHTML = '<table><thead><tr><th>Instructor</th>' + grupos.map(function(g){ return '<th class="r">'+esc(g.nombre)+' (h)</th>'; }).join("") +
+    $("c-inst").innerHTML = '<table><thead><tr><th>Instructor</th>' + grupos.map(function(g){ return '<th class="r">'+esc(g.nombre)+'</th><th class="r">$</th>'; }).join("") +
       '<th class="r">Días de vuelo</th><th class="r">Honorarios</th><th class="r">Viáticos</th><th class="r">Total</th></tr></thead><tbody>' +
       list.map(function(p){
         var note = !p.cobra ? ' <span class="tag">no cobra</span>' : !p.enTabla ? ' <span class="tag" title="No está en la pestaña Tarifas: se calcula al % de cada avión, sin viático">no está en Tarifas</span>' : '';
-        return '<tr'+(p.cobra ? '' : ' class="dim"')+'><td>'+esc(p.nombre)+note+'</td>' + grupos.map(function(g){ return '<td class="r">'+(p.h[g.nombre] ? hrs1(p.h[g.nombre]) : '—')+'</td>'; }).join("") +
+        return '<tr'+(p.cobra ? '' : ' class="dim"')+'><td>'+esc(p.nombre)+note+'</td>' + grupos.map(function(g){ return '<td class="r">'+(p.h[g.nombre] ? hrs1(p.h[g.nombre]) : '—')+'</td><td class="r">'+(p.m[g.nombre] ? money(p.m[g.nombre]) : '—')+'</td>'; }).join("") +
           '<td class="r">'+(p.dias || '—')+'</td><td class="r">'+money(p.hon)+'</td><td class="r">'+(p.viat ? money(p.viat) : '—')+'</td><td class="r"><b>'+money(p.hon + p.viat)+'</b></td></tr>';
       }).join("") +
-      '<tr class="tot"><td><b>Total</b></td>' + grupos.map(function(g){ var s = list.reduce(function(t, p){ return t + (p.h[g.nombre] || 0); }, 0); return '<td class="r"><b>'+(s ? hrs1(s) : '—')+'</b></td>'; }).join("") +
+      '<tr class="tot"><td><b>Total</b></td>' + grupos.map(function(g){ var s = list.reduce(function(t, p){ return t + (p.h[g.nombre] || 0); }, 0); var $m = list.reduce(function(t, p){ return t + (p.m[g.nombre] || 0); }, 0); return '<td class="r"><b>'+(s ? hrs1(s) : '—')+'</b></td><td class="r"><b>'+($m ? money($m) : '—')+'</b></td>'; }).join("") +
       '<td class="r"></td><td class="r"><b>'+money(tot.hon)+'</b></td><td class="r"><b>'+money(tot.viat)+'</b></td><td class="r"><b>'+money(tot.hon + tot.viat)+'</b></td></tr></tbody></table>';
   }
 
