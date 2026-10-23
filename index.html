@@ -111,6 +111,16 @@ select.sel{border:1px solid var(--line);background:var(--surface);border-radius:
 
 /* Tablas */
 .tbl{overflow-x:auto}
+.alu-ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.alu-ctl .sel{max-width:260px}
+.btn:disabled{opacity:.45;cursor:default}
+.alu-sum{display:flex;flex-wrap:wrap;gap:10px 26px;margin:12px 0 6px}
+.alu-sum>div{display:flex;flex-direction:column;gap:2px}
+.alu-sum b{font-size:1.15rem}
+.alu-tbl{max-height:520px;overflow:auto;margin-top:8px}
+.alu-tbl thead th{position:sticky;top:0;background:var(--surface);z-index:1}
+#students .hrow{cursor:pointer}
+#students .hrow:hover .n{text-decoration:underline}
 table{border-collapse:collapse;width:100%;font-size:.84rem}
 th{font-family:var(--f-mono);font-weight:500;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--axis);white-space:nowrap}
 td{padding:6px 8px;border-bottom:1px solid var(--grid);white-space:nowrap}
@@ -129,6 +139,7 @@ footer{color:var(--muted);font-size:.78rem}
 
 /* Solapas */
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:-8px}
+@media (max-width:520px){.tabs{overflow-x:auto;scrollbar-width:none}.tab{padding:8px 9px;font-size:.95rem;white-space:nowrap}}
 .tab{background:none;border:none;border-bottom:3px solid transparent;padding:8px 14px;margin-bottom:-1px;cursor:pointer;font-family:var(--f-display);font-size:1.1rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .tab:hover{color:var(--fg)}
 .tab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--brand)}
@@ -264,6 +275,15 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
       <div class="hbars" id="dest"></div>
     </section>
   </div>
+
+  <section class="panel" aria-labelledby="h-alu">
+    <div class="phead"><h2 id="h-alu">Vuelos por alumno</h2>
+      <div class="alu-ctl"><label class="mfilter"><span class="flabel">Alumno</span><select class="sel" id="f-alu"><option value="">Elegí un alumno…</option></select></label>
+        <button class="btn" id="alu-xls" type="button" disabled>Descargar Excel</button><button class="btn" id="alu-pdf" type="button" disabled>Descargar PDF</button></div>
+    </div>
+    <p class="sub" style="margin:0">Todos los vuelos registrados del alumno, incluido el simulador, sin aplicar los filtros de arriba.</p>
+    <div id="alu-body"></div>
+  </section>
 
   <section class="panel" aria-labelledby="h-last">
     <div class="phead"><h2 id="h-last">Últimos vuelos</h2><span class="sub" id="last-sub"></span></div>
@@ -683,7 +703,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
       var segs = acs.filter(function(a){ return o.by[a]; }).map(function(a){
         return '<b title="'+esc(a)+': '+fmtH(o.by[a])+' h" style="width:'+(o.by[a]/max*100)+'%;background:'+acColor(a)+'"></b>';
       }).join("");
-      return '<div class="hrow" title="'+esc(k)+' · '+fmtH(o.h)+' h · '+o.n+' vuelos"><span class="n">'+esc(k)+'</span><span class="track">'+segs+'</span><span class="val">'+fmtH(o.h)+(showFlights?' <small>('+o.n+')</small>':'')+'</span></div>';
+      return '<div class="hrow" data-n="'+esc(k)+'" title="'+esc(k)+' · '+fmtH(o.h)+' h · '+o.n+' vuelos"><span class="n">'+esc(k)+'</span><span class="track">'+segs+'</span><span class="val">'+fmtH(o.h)+(showFlights?' <small>('+o.n+')</small>':'')+'</span></div>';
     }).join("");
   }
   var PURPOSE = {INST:"Instrucción (INST)", ENT:"Entrenamiento (ENT)", EXA:"Examen (EXA)"};
@@ -1101,12 +1121,243 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     stackedRank(rows, "pilot", 12, $("students"));
     renderPurpose(rows);
     renderLast(rows);
+    renderAlumno();
     renderProjAvg();
     renderMant();
     renderControles();
     $("month-table").hidden = !state.showTable;
     $("toggle-table").textContent = state.showTable ? "Ocultar tabla" : "Ver como tabla";
   }
+
+  // ---------- Vuelos por alumno (todos sus vuelos, con descarga a Excel y PDF) ----------
+  // Junta vuelos y sesiones de simulador por nombre normalizado (une variantes como Marazzo / Marazza).
+  function aluIndex(){
+    var names = state.rows.map(function(r){ return r.pilot; }).concat((state.sim || []).map(function(s){ return s[1]; }));
+    var key = nameIndex(names), A = {};
+    function add(n, f){
+      var k = key(n); if (!k || /^sin nombre$/.test(k)) return;
+      var a = A[k] || (A[k] = { k: k, var: {}, f: [] });
+      var nm = clean(n); a.var[nm] = (a.var[nm] || 0) + 1; a.f.push(f);
+    }
+    state.rows.forEach(function(r){ add(r.pilot, { date: r.date, ac: r.ac, inst: r.inst, purpose: r.purpose, from: r.from, to: r.to, dep: r.dep, arr: r.arr, hours: r.hours }); });
+    (state.sim || []).forEach(function(s){
+      var d = parseDate(s[0]), h = parseHours(s[4]); if (!d || !(h > 0 && h <= 12)) return;
+      add(s[1], { date: d, ac: "Simulador", inst: clean(s[3]) || "—", purpose: clean(s[2]).toUpperCase() || "—", from: "", to: "", dep: "", arr: "", hours: h });
+    });
+    Object.keys(A).forEach(function(k){
+      var a = A[k]; a.nombre = Object.keys(a.var).sort(function(x, y){ return a.var[y] - a.var[x]; })[0];
+      a.f.sort(function(x, y){ return x.date - y.date; });
+      a.h = a.f.reduce(function(t, f){ return t + f.hours; }, 0);
+    });
+    state.aluIdx = { key: key, A: A };
+    return state.aluIdx;
+  }
+  function aluResumen(a){
+    var by = {}; a.f.forEach(function(f){ by[f.ac] = (by[f.ac] || 0) + f.hours; });
+    var order = aircraftList().concat(Object.keys(by)).filter(function(x, i, l){ return by[x] && l.indexOf(x) === i; });
+    return order.map(function(x){ return [x, by[x]]; });
+  }
+  function fecha4(d){ return String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear(); }
+  function ruta(f){ return f.from || f.to ? (f.from || "—") + " - " + (f.to || "—") : "—"; }
+  function renderAlumno(){
+    var ix = state.aluIdx || aluIndex(), A = ix.A;
+    var keys = Object.keys(A).sort(function(x, y){ return A[x].nombre.localeCompare(A[y].nombre, "es"); });
+    if (state.alu && !A[state.alu]) state.alu = "";
+    var sel = $("f-alu");
+    sel.innerHTML = '<option value="">Elegí un alumno…</option>' + keys.map(function(k){ return '<option value="'+esc(k)+'"'+(k === state.alu ? ' selected' : '')+'>'+esc(A[k].nombre)+' ('+fmtH1(A[k].h)+' h)</option>'; }).join("");
+    var a = A[state.alu];
+    $("alu-xls").disabled = $("alu-pdf").disabled = !a;
+    if (!a){ $("alu-body").innerHTML = '<p class="sub">Elegí un alumno en la lista, o tocá su nombre en «Alumnos y pilotos», para ver todos sus vuelos y descargarlos.</p>'; return; }
+    var res = aluResumen(a), otros = Object.keys(a.var).filter(function(n){ return n !== a.nombre; });
+    function k(t, v){ return '<div><span class="flabel">'+esc(t)+'</span><b class="num">'+v+'</b></div>'; }
+    $("alu-body").innerHTML =
+      '<div class="alu-sum">' + k("Vuelos", fmtInt(a.f.length)) + k("Horas", fmtH1(a.h)) +
+        res.map(function(r){ return k(r[0], fmtH1(r[1]) + ' h'); }).join("") +
+        k("Primer vuelo", fmtDate(a.f[0].date)) + k("Último vuelo", fmtDate(a.f[a.f.length - 1].date)) + '</div>' +
+      (otros.length ? '<p class="sub" style="margin:0">También cargado como: '+esc(otros.join(", "))+'</p>' : '') +
+      '<div class="tbl alu-tbl"><table><thead><tr><th>#</th><th>Fecha</th><th>Avión</th><th>Instructor</th><th>Finalidad</th><th>Ruta</th><th class="r">Horas</th><th class="r">Acumulado</th></tr></thead><tbody>' +
+      (function(){ var acc = 0; return a.f.map(function(f, i){ acc += f.hours;
+        return '<tr><td class="num sub">'+(i + 1)+'</td><td class="num">'+fmtDate(f.date)+'</td><td>'+(f.ac === "Simulador" ? 'Simulador' : '<span class="acdot" style="background:'+acColor(f.ac)+'"></span>'+esc(f.ac))+'</td><td>'+esc(f.inst)+'</td><td><span class="tag">'+esc(f.purpose)+'</span></td><td class="num">'+esc(ruta(f))+'</td><td class="r">'+fmtH1(f.hours)+'</td><td class="r sub">'+fmtH1(acc)+'</td></tr>'; }).join(""); })() +
+      '<tr class="tot"><td></td><td colspan="5"><b>Total · '+fmtInt(a.f.length)+' vuelos</b></td><td class="r"><b>'+fmtH1(a.h)+'</b></td><td></td></tr></tbody></table></div>';
+  }
+  function aluArchivo(a, ext){
+    var n = new Date();
+    return "Vuelos - " + a.nombre.replace(/[\\\/:*?"<>|]/g, "") + " - " + n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0") + "-" + String(n.getDate()).padStart(2, "0") + "." + ext;
+  }
+  function descargar(bytes, nombre, tipo){
+    var url = URL.createObjectURL(new Blob([bytes], { type: tipo })), link = document.createElement("a");
+    link.href = url; link.download = nombre; document.body.appendChild(link); link.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); link.remove(); }, 1500);
+  }
+
+  // --- ZIP mínimo (sin compresión) para armar el .xlsx sin librerías externas ---
+  var CRC_T = (function(){ var t = [], c; for (var n = 0; n < 256; n++){ c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b){ var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files){
+    var enc = new TextEncoder(), parts = [], cen = [], off = 0, d = new Date();
+    var dt = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate(), tm = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+    function u16(v){ return [v & 255, (v >> 8) & 255]; }
+    function u32(v){ return [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255]; }
+    files.forEach(function(f){
+      var name = enc.encode(f[0]), data = enc.encode(f[1]), crc = crc32(data);
+      var common = [].concat(u16(20), u16(0x0800), u16(0), u16(tm), u16(dt), u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0));
+      var lh = new Uint8Array([].concat(u32(0x04034b50), common)); parts.push(lh, name, data);
+      cen.push(new Uint8Array([].concat(u32(0x02014b50), u16(20), common, u16(0), u16(0), u16(0), u32(0), u32(off))), name);
+      off += lh.length + name.length + data.length;
+    });
+    var cenLen = cen.reduce(function(t, b){ return t + b.length; }, 0);
+    var end = new Uint8Array([].concat(u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length), u32(cenLen), u32(off), u16(0)));
+    var all = parts.concat(cen, [end]), out = new Uint8Array(off + cenLen + end.length), p = 0;
+    all.forEach(function(b){ out.set(b, p); p += b.length; });
+    return out;
+  }
+  function xesc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); }
+  function colL(i){ var s = ""; i++; while (i){ var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+  // Celdas: texto, número, {d: Date}, {v, s: estilo}, {f: fórmula, v}. Estilos: 1 negrita, 2 fecha, 3 0,0, 4 negrita 0,0, 5 título, 6 encabezado
+  function xlsx(nombreHoja, filas, anchos, congelar){
+    var sheet = filas.map(function(fila, r){
+      return '<row r="'+(r + 1)+'">' + fila.map(function(c, i){
+        if (c === null || c === undefined || c === "") return "";
+        var ref = colL(i) + (r + 1), s = 0, v = c;
+        if (typeof c === "object" && !(c instanceof Date)){ s = c.s || 0; v = c.d ? c.d : c.f ? c : c.v; if (c.d && !c.s) s = 2; }
+        if (v instanceof Date) return '<c r="'+ref+'" s="'+(s || 2)+'"><v>'+((Date.UTC(v.getFullYear(), v.getMonth(), v.getDate()) - Date.UTC(1899, 11, 30)) / 864e5)+'</v></c>';
+        if (v && v.f) return '<c r="'+ref+'" s="'+s+'"><f>'+xesc(v.f)+'</f><v>'+(v.v || 0)+'</v></c>';
+        if (typeof v === "number") return '<c r="'+ref+'" s="'+s+'"><v>'+v+'</v></c>';
+        return '<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+xesc(v)+'</t></is></c>';
+      }).join("") + '</row>';
+    }).join("");
+    var ws = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      (congelar ? '<sheetViews><sheetView workbookViewId="0"><pane ySplit="'+congelar+'" topLeftCell="A'+(congelar + 1)+'" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' : '') +
+      '<cols>' + anchos.map(function(w, i){ return '<col min="'+(i + 1)+'" max="'+(i + 1)+'" width="'+w+'" customWidth="1"/>'; }).join("") + '</cols><sheetData>' + sheet + '</sheetData>' +
+      '<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>';
+    var styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<numFmts count="2"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/><numFmt numFmtId="165" formatCode="0.0"/></numFmts>' +
+      '<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FFC41230"/><name val="Calibri"/></font></fonts>' +
+      '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE7E5E0"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+      '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top style="thin"/><bottom/><diagonal/></border></borders>' +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="7">' +
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+      '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/>' +
+      '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+      '<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+      '<xf numFmtId="165" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1"/>' +
+      '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+      '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>' +
+      '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+    return zip([
+      ["[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+      ["_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+      ["xl/workbook.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="'+xesc(nombreHoja.slice(0, 31))+'" sheetId="1" r:id="rId1"/></sheets></workbook>'],
+      ["xl/_rels/workbook.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+      ["xl/worksheets/sheet1.xml", ws],
+      ["xl/styles.xml", styles]
+    ]);
+  }
+  function aluExcel(a){
+    var hoy = new Date(), filas = [
+      [{ v: "Génesis Aviación · Vuelos de " + a.nombre, s: 5 }],
+      ["Generado el " + fecha4(hoy) + " · " + a.f.length + " vuelos · " + fmtH1(a.h) + " h · del " + fecha4(a.f[0].date) + " al " + fecha4(a.f[a.f.length - 1].date)],
+      [],
+      ["Fecha", "Avión", "Instructor", "Finalidad", "Origen", "Destino", "Horas"].map(function(t){ return { v: t, s: 6 }; })
+    ];
+    var ini = filas.length + 1;
+    a.f.forEach(function(f){ filas.push([{ d: f.date }, f.ac, f.inst, f.purpose, f.from, f.to, { v: Math.round(f.hours * 100) / 100, s: 3 }]); });
+    var fin = filas.length;
+    filas.push([{ v: "Total", s: 1 }, { v: a.f.length + " vuelos", s: 1 }, { v: "", s: 1 }, { v: "", s: 1 }, { v: "", s: 1 }, { v: "", s: 1 }, { f: "SUM(G" + ini + ":G" + fin + ")", v: Math.round(a.h * 100) / 100, s: 4 }]);
+    filas.push([]); filas.push([{ v: "Horas por avión", s: 6 }, { v: "", s: 6 }]);
+    aluResumen(a).forEach(function(r){ filas.push([r[0], { v: Math.round(r[1] * 100) / 100, s: 3 }]); });
+    return xlsx("Vuelos", filas, [12, 11, 24, 11, 9, 9, 9], 4);
+  }
+
+  // --- PDF mínimo (Helvetica, A4) sin librerías externas ---
+  var HW = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
+  function pdfTxt(s){ return String(s == null ? "" : s).replace(/[–—]/g, "-").replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/·/g, "\xB7").replace(/[^\x20-\x7E\xA0-\xFF]/g, "?"); }
+  function anchoTxt(s, size, bold){
+    var w = 0; s = pdfTxt(s);
+    for (var i = 0; i < s.length; i++){ var c = s.charCodeAt(i); if (c > 126) c = s[i].normalize("NFD").charCodeAt(0); w += HW[c - 32] || 556; }
+    return w * size / 1000 * (bold ? 1.06 : 1);
+  }
+  function cortar(s, max, size, bold){ s = pdfTxt(s); if (anchoTxt(s, size, bold) <= max) return s; while (s.length > 1 && anchoTxt(s + "...", size, bold) > max) s = s.slice(0, -1); return s + "..."; }
+  function pdfDoc(paginas){
+    // paginas: lista de strings con operadores de contenido
+    var objs = [], W = 595.28, H = 841.89;
+    objs[1] = "<< /Type /Catalog /Pages 2 0 R >>";
+    objs[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
+    objs[4] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
+    var kids = [];
+    paginas.forEach(function(c, i){
+      var po = 5 + i * 2, co = po + 1;
+      objs[po] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + W + " " + H + "] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + co + " 0 R >>";
+      objs[co] = "<< /Length " + c.length + " >>\nstream\n" + c + "\nendstream";
+      kids.push(po + " 0 R");
+    });
+    objs[2] = "<< /Type /Pages /Kids [" + kids.join(" ") + "] /Count " + paginas.length + " >>";
+    var out = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n", xref = [];
+    for (var n = 1; n < objs.length; n++){ xref[n] = out.length; out += n + " 0 obj\n" + objs[n] + "\nendobj\n"; }
+    var xs = out.length;
+    out += "xref\n0 " + objs.length + "\n0000000000 65535 f \n";
+    for (n = 1; n < objs.length; n++) out += String(xref[n]).padStart(10, "0") + " 00000 n \n";
+    out += "trailer\n<< /Size " + objs.length + " /Root 1 0 R /Info << /Producer (Tablero Genesis) >> >>\nstartxref\n" + xs + "\n%%EOF";
+    var b = new Uint8Array(out.length); for (var i = 0; i < out.length; i++) b[i] = out.charCodeAt(i) & 255;
+    return b;
+  }
+  function aluPdf(a){
+    var W = 595.28, H = 841.89, M = 40, hoy = new Date();
+    var cols = [["#", 22, "r"], ["Fecha", 58], ["Avión", 62], ["Instructor", 140], ["Finalidad", 58], ["Ruta", 90], ["Horas", 42, "r"], ["Acum.", 43, "r"]];
+    function esc2(s){ return pdfTxt(s).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)"); }
+    function txt(x, y, s, size, bold, color){ return (color || "0 0 0") + " rg BT /" + (bold ? "F2" : "F1") + " " + size + " Tf " + x.toFixed(2) + " " + y.toFixed(2) + " Td (" + esc2(s) + ") Tj ET\n"; }
+    function txtR(x, y, s, size, bold, color){ return txt(x - anchoTxt(s, size, bold), y, s, size, bold, color); }
+    function linea(x1, y1, x2, y2, gris){ return (gris || "0.8") + " G 0.5 w " + x1 + " " + y1.toFixed(2) + " m " + x2 + " " + y2.toFixed(2) + " l S\n"; }
+    function celdas(y, vals, size, bold, color){
+      var x = M, s = "";
+      cols.forEach(function(c, i){ var v = cortar(vals[i], c[1] - 6, size, bold); s += c[2] === "r" ? txtR(x + c[1] - 4, y, v, size, bold, color) : txt(x + 2, y, v, size, bold, color); x += c[1]; });
+      return s;
+    }
+    var paginas = [], c = "", y, fila = 15, acc = 0;
+    function encabezadoTabla(){
+      c += "0.906 0.898 0.878 rg " + M + " " + (y - 5).toFixed(2) + " " + (W - 2 * M) + " 16 re f\n";
+      c += celdas(y, cols.map(function(x){ return x[0]; }), 8, true, "0.25 0.25 0.25"); y -= fila + 2;
+    }
+    function nuevaPagina(primera){
+      if (c) paginas.push(c);
+      c = ""; y = H - M;
+      if (primera){
+        c += txt(M, y - 4, "Génesis Aviación", 10, true, "0.769 0.071 0.188"); y -= 26;
+        c += txt(M, y, "Vuelos de " + a.nombre, 17, true); y -= 18;
+        c += txt(M, y, "Generado el " + fecha4(hoy) + "  ·  del " + fecha4(a.f[0].date) + " al " + fecha4(a.f[a.f.length - 1].date), 9, false, "0.35 0.35 0.35"); y -= 22;
+        var res = [["Vuelos", fmtInt(a.f.length)], ["Horas totales", fmtH1(a.h)]].concat(aluResumen(a).map(function(r){ return [r[0], fmtH1(r[1]) + " h"]; })), x = M;
+        res.forEach(function(r){ c += txt(x, y, r[0].toUpperCase(), 7, false, "0.45 0.45 0.45") + txt(x, y - 15, r[1], 13, true); x += Math.max(70, anchoTxt(r[0].toUpperCase(), 7) + 18, anchoTxt(r[1], 13, true) + 18); });
+        y -= 34; c += linea(M, y + 8, W - M, y + 8, "0.6"); y -= 8;
+      } else {
+        c += txt(M, y, "Vuelos de " + a.nombre + " (continuación)", 9, true, "0.35 0.35 0.35"); y -= 18;
+      }
+      encabezadoTabla();
+    }
+    nuevaPagina(true);
+    a.f.forEach(function(f, i){
+      if (y < M + 30) nuevaPagina(false);
+      acc += f.hours;
+      c += celdas(y, [String(i + 1), fecha4(f.date), f.ac, f.inst, f.purpose, ruta(f), fmtH1(f.hours), fmtH1(acc)], 8, false);
+      c += linea(M, y - 5, W - M, y - 5, "0.88"); y -= fila;
+    });
+    if (y < M + 30) nuevaPagina(false);
+    c += linea(M, y + 9, W - M, y + 9, "0.3");
+    c += txt(M + 24, y - 2, "Total  ·  " + fmtInt(a.f.length) + " vuelos", 9, true);
+    var xh = M + cols.slice(0, 7).reduce(function(t, x){ return t + x[1]; }, 0) - 4;
+    c += txtR(xh, y - 2, fmtH1(a.h), 9, true);
+    paginas.push(c);
+    paginas = paginas.map(function(p, i){ return p + txtR(W - M, 24, "Página " + (i + 1) + " de " + paginas.length, 8, false, "0.5 0.5 0.5") + txt(M, 24, "Registro de vuelos · Génesis Aviación", 8, false, "0.5 0.5 0.5"); });
+    return pdfDoc(paginas);
+  }
+  $("f-alu").addEventListener("change", function(e){ state.alu = e.target.value; renderAlumno(); });
+  $("alu-xls").addEventListener("click", function(){ var a = state.aluIdx && state.aluIdx.A[state.alu]; if (a) descargar(aluExcel(a), aluArchivo(a, "xlsx"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); });
+  $("alu-pdf").addEventListener("click", function(){ var a = state.aluIdx && state.aluIdx.A[state.alu]; if (a) descargar(aluPdf(a), aluArchivo(a, "pdf"), "application/pdf"); });
+  document.addEventListener("click", function(e){
+    var r = e.target.closest && e.target.closest("#students .hrow[data-n]");
+    if (!r) return;
+    var ix = state.aluIdx || aluIndex(); state.alu = ix.key(r.getAttribute("data-n")); renderAlumno();
+    $("h-alu").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 
   // ---------- Eventos ----------
   document.addEventListener("click", function(e){
@@ -1215,6 +1466,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
       var r = []; r[1] = c[0]; r[2] = c[1]; r[3] = c[2]; r[4] = c[3]; r[5] = c[4]; r[6] = c[5]; r[9] = c[6]; r[13] = c[7]; return r;
     }));
     state.mant = d.mant || [];
+    state.aluIdx = null;
     state.tar = d.tar || null; state.sim = d.sim || []; state.pagos = d.pagos || [];
     onSheetData(rows, d.ts);
     onAgenda(d.agenda || []);
