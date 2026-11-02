@@ -1010,15 +1010,17 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
       k("Viáticos", money(tot.viat), "Por día de vuelo, según la pestaña Tarifas") +
       k("Instructores", fmtInt(list.filter(function(p){ return p.cobra; }).length), list.some(function(p){ return !p.cobra; }) ? fmtInt(list.filter(function(p){ return !p.cobra; }).length) + " con vuelos que no cobran" : "con vuelos en el mes");
     if (!list.length){ $("c-inst").innerHTML = '<p class="sub">No hay vuelos con instructor en este mes.</p>'; return; }
+    var gUsa = grupos.filter(function(g){ return list.some(function(p){ return p.h[g.nombre]; }); }); if (gUsa.length) grupos = gUsa;
+    function num0(v){ return (Math.round(v) || 0).toLocaleString("es-AR"); }
     $("c-inst").innerHTML = '<table><thead><tr><th>Instructor</th>' + grupos.map(function(g){ return '<th class="r">'+esc(g.nombre)+'</th><th class="r">$</th>'; }).join("") +
-      '<th class="r">Días de vuelo</th><th class="r">Honorarios</th><th class="r">Viáticos</th><th class="r">Total</th></tr></thead><tbody>' +
+      '<th class="r">Días</th><th class="r">Honorarios $</th><th class="r">Viáticos $</th><th class="r">Total $</th></tr></thead><tbody>' +
       list.map(function(p){
         var note = !p.cobra ? ' <span class="tag">no cobra</span>' : !p.enTabla ? ' <span class="tag" title="No está en la pestaña Tarifas: se calcula al % de cada avión, sin viático">no está en Tarifas</span>' : '';
-        return '<tr'+(p.cobra ? '' : ' class="dim"')+'><td>'+esc(p.nombre)+note+'</td>' + grupos.map(function(g){ return '<td class="r">'+(p.h[g.nombre] ? hrs1(p.h[g.nombre]) : '—')+'</td><td class="r">'+(p.m[g.nombre] ? money(p.m[g.nombre]) : '—')+'</td>'; }).join("") +
-          '<td class="r">'+(p.dias || '—')+'</td><td class="r">'+money(p.hon)+'</td><td class="r">'+(p.viat ? money(p.viat) : '—')+'</td><td class="r"><b>'+money(p.hon + p.viat)+'</b></td></tr>';
+        return '<tr'+(p.cobra ? '' : ' class="dim"')+'><td>'+esc(p.nombre)+note+'</td>' + grupos.map(function(g){ return '<td class="r">'+(p.h[g.nombre] ? hrs1(p.h[g.nombre]) : '—')+'</td><td class="r">'+(p.m[g.nombre] ? num0(p.m[g.nombre]) : '—')+'</td>'; }).join("") +
+          '<td class="r">'+(p.dias || '—')+'</td><td class="r">'+num0(p.hon)+'</td><td class="r">'+(p.viat ? num0(p.viat) : '—')+'</td><td class="r"><b>'+num0(p.hon + p.viat)+'</b></td></tr>';
       }).join("") +
-      '<tr class="tot"><td><b>Total</b></td>' + grupos.map(function(g){ var s = list.reduce(function(t, p){ return t + (p.h[g.nombre] || 0); }, 0); var $m = list.reduce(function(t, p){ return t + (p.m[g.nombre] || 0); }, 0); return '<td class="r"><b>'+(s ? hrs1(s) : '—')+'</b></td><td class="r"><b>'+($m ? money($m) : '—')+'</b></td>'; }).join("") +
-      '<td class="r"></td><td class="r"><b>'+money(tot.hon)+'</b></td><td class="r"><b>'+money(tot.viat)+'</b></td><td class="r"><b>'+money(tot.hon + tot.viat)+'</b></td></tr></tbody></table>';
+      '<tr class="tot"><td><b>Total</b></td>' + grupos.map(function(g){ var s = list.reduce(function(t, p){ return t + (p.h[g.nombre] || 0); }, 0); var $m = list.reduce(function(t, p){ return t + (p.m[g.nombre] || 0); }, 0); return '<td class="r"><b>'+(s ? hrs1(s) : '—')+'</b></td><td class="r"><b>'+($m ? num0($m) : '—')+'</b></td>'; }).join("") +
+      '<td class="r"></td><td class="r"><b>'+num0(tot.hon)+'</b></td><td class="r"><b>'+num0(tot.viat)+'</b></td><td class="r"><b>'+num0(tot.hon + tot.viat)+'</b></td></tr></tbody></table>';
   }
 
   // ----- Pagos de alumnos -----
