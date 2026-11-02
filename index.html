@@ -301,7 +301,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     <div class="notice" id="c-nocfg" hidden><b>Falta la pestaña «Tarifas»</b><span>Los controles usan las tarifas, el % de instructor y los viáticos de la pestaña «Tarifas» de la planilla.</span></div>
     <div class="view" id="c-body">
       <section class="panel" aria-labelledby="h-cinst">
-        <div class="phead"><h2 id="h-cinst">Previsión honorarios instructores</h2><div class="chips" id="c-mes"></div></div>
+        <div class="phead"><h2 id="h-cinst">Previsión honorarios instructores</h2><div class="chips" id="c-mes" style="align-items:center;gap:12px"></div></div>
         <div class="kpis" id="c-inst-kpis"></div>
         <div class="tbl" id="c-inst"></div>
       </section>
@@ -965,8 +965,8 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     }
     state.rows.forEach(function(r){
       if (monthKey(r.date) !== mk) return;
-      var p = get(r.inst); if (!p) return;
       var g = cfg.byMat[r.ac]; if (!g) return;
+      var p = get(r.inst); if (!p) return;
       var rate = p.cfg && p.cfg.hAv ? p.cfg.hAv : g.tarifa * g.pct;
       p.h[g.nombre] = (p.h[g.nombre] || 0) + r.hours;
       p.m[g.nombre] = (p.m[g.nombre] || 0) + r.hours * rate;
@@ -976,7 +976,8 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     (state.sim || []).forEach(function(s){
       var d = parseDate(s[0]); if (!d || monthKey(d) !== mk) return;
       var h = parseHours(s[4]); if (!(h > 0 && h <= 12)) return;
-      var p = get(s[3]); if (!p || !cfg.sim) return;
+      if (!cfg.sim) return;
+      var p = get(s[3]); if (!p) return;
       var rate = p.cfg && p.cfg.hSim ? p.cfg.hSim : cfg.sim.tarifa * cfg.sim.pct;
       p.h[cfg.sim.nombre] = (p.h[cfg.sim.nombre] || 0) + h;
       p.m[cfg.sim.nombre] = (p.m[cfg.sim.nombre] || 0) + h * rate;
@@ -989,17 +990,22 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     }).sort(function(a,b){ return (b.hon + b.viat) - (a.hon + a.viat) || a.nombre.localeCompare(b.nombre); });
   }
   function renderInstructores(cfg){
-    // Solo el mes en curso: cada mes se liquida distinto
-    var now = new Date(), opts = [monthKey(now)];
-    state.ctrlMes = opts[0];
-    $("c-mes").innerHTML = '<span class="sub">'+MESES_L[now.getMonth()]+' '+now.getFullYear()+' · vuelos al '+fmtDate(now)+'</span>';
+    // Liquidación por mes: por defecto el mes en curso; se pueden elegir los anteriores desde la fecha de inicio de Tarifas
+    var now = new Date(), opts = [];
+    for (var dm = new Date(now.getFullYear(), now.getMonth(), 1); dm >= new Date(cfg.desde.getFullYear(), cfg.desde.getMonth(), 1) && opts.length < 36; dm = new Date(dm.getFullYear(), dm.getMonth() - 1, 1)) opts.push(monthKey(dm));
+    if (!state.ctrlMes || opts.indexOf(state.ctrlMes) < 0) state.ctrlMes = opts[0];
+    var mk = state.ctrlMes, finMk = new Date(Math.floor(mk/100), mk%100 + 1, 0);
+    $("c-mes").innerHTML = '<label class="mfilter"><span class="flabel">Mes</span><select class="sel" id="c-mes-sel">' +
+      opts.map(function(o){ return '<option value="'+o+'"'+(o === mk ? ' selected' : '')+'>'+MESES_L[o%100]+' '+Math.floor(o/100)+(o === opts[0] ? ' (en curso)' : '')+'</option>'; }).join("") +
+      '</select></label><span class="sub">'+(mk === opts[0] ? 'vuelos al '+fmtDate(now) : 'mes cerrado · vuelos del 01 al '+fmtDate(finMk))+'</span>';
+    $("h-cinst").textContent = mk === opts[0] ? "Previsión honorarios instructores" : "Liquidación honorarios instructores";
     var list = instructorMes(cfg, state.ctrlMes), grupos = cfg.grupos;
     var tot = { hon: 0, viat: 0, h: 0, dias: 0 };
     list.forEach(function(p){ tot.hon += p.hon; tot.viat += p.viat; tot.dias += p.dias; Object.keys(p.h).forEach(function(g){ tot.h += p.h[g]; }); });
     var esActual = state.ctrlMes === opts[0];
     function k(t, v, d){ return '<div class="kpi"><span class="k">'+esc(t)+'</span><span class="v num">'+v+'</span><span class="d">'+d+'</span></div>'; }
     $("c-inst-kpis").innerHTML =
-      k(esActual ? "A previsionar este mes" : "Total de " + MESES_L[state.ctrlMes%100], money(tot.hon + tot.viat), esActual ? "Acumulado al " + fmtDate(now) + " · se paga a fin de mes" : "Honorarios más viáticos") +
+      k(esActual ? "A previsionar este mes" : "A pagar · " + MESES_L[state.ctrlMes%100] + " " + Math.floor(state.ctrlMes/100), money(tot.hon + tot.viat), esActual ? "Acumulado al " + fmtDate(now) + " · se paga a fin de mes" : "Honorarios más viáticos del mes") +
       k("Honorarios por horas", money(tot.hon), hrs1(tot.h) + " h instruidas") +
       k("Viáticos", money(tot.viat), "Por día de vuelo, según la pestaña Tarifas") +
       k("Instructores", fmtInt(list.filter(function(p){ return p.cobra; }).length), list.some(function(p){ return !p.cobra; }) ? fmtInt(list.filter(function(p){ return !p.cobra; }).length) + " con vuelos que no cobran" : "con vuelos en el mes");
@@ -1399,6 +1405,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     if (m){ state.ctrlMes = +m.getAttribute("data-cmes"); renderControles(); }
     if (e.target.id === "c-more"){ state.ctrlAll = !state.ctrlAll; renderControles(); }
   });
+  document.addEventListener("change", function(e){ if (e.target.id === "c-mes-sel"){ state.ctrlMes = +e.target.value; renderControles(); } });
   $("c-ver").addEventListener("change", function(e){ state.ctrlVer = e.target.value; state.ctrlAll = false; renderControles(); });
   $("f-inst").addEventListener("change", function(e){ state.inst = e.target.value; render(); });
   $("toggle-table").addEventListener("click", function(){ state.showTable = !state.showTable; render(); });
