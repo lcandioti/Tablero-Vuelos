@@ -1031,6 +1031,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     state.rows.forEach(function(r){ all.push(r.pilot); });
     (state.sim || []).forEach(function(s){ all.push(s[1]); });
     (state.pagos || []).forEach(function(p){ all.push(p[1]); });
+    (state.ini || []).forEach(function(p){ all.push(p[0]); });
     var key = nameIndex(all), P = {};
     function get(n){
       var k = key(n); if (!k || instKeys[k] || /^(sin nombre|n a|na)$/.test(k)) return null;
@@ -1061,6 +1062,12 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
       var p = get(x[1]); if (!p) return;
       G(p, g).pag += h;
       if (!p.ultPago || d > p.ultPago) p.ultPago = d;
+    });
+    // Saldo inicial cargado a mano (pestaña «Saldo inicial alumnos»): suma o resta horas pagas al arranque
+    (state.ini || []).forEach(function(x){
+      var g = x[1] === "SIM" ? cfg.sim : x[1] === "C150" ? (cfg.byMat.IQB || cfg.byMat.FPJ) : cfg.byMat.S091; if (!g) return;
+      var p = get(x[0]); if (!p) return;
+      G(p, g).pag += Number(x[2]) || 0;
     });
     var pend = [];
     var alumnos = Object.keys(P).map(function(k){
@@ -1115,7 +1122,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     if (!cfg || !state.rows) return;
     renderInstructores(cfg);
     renderPagos(cfg);
-    $("c-nota").innerHTML = 'Pagos: las horas abonadas en «Ingresos» se usan contra los vuelos de cada alumno en orden de fecha, por tipo de avión, desde el '+fmtDate(cfg.desde)+'. «Saldo en $» suma los tipos de avión a la tarifa actual, así que si alguien pagó un avión y voló otro se compensa. No se controla el pago de los instructores ni de las personas de la lista «No controlar pagos de» de la pestaña Tarifas. Honorarios: horas del mes × (% de la tarifa del avión, o el valor fijo del instructor) + viático por cada día con vuelos en avión.';
+    $("c-nota").innerHTML = 'Pagos: las horas abonadas en «Ingresos», más el saldo inicial de la pestaña «Saldo inicial alumnos», se usan contra los vuelos de cada alumno en orden de fecha, por tipo de avión, desde el '+fmtDate(cfg.desde)+'. «Saldo en $» suma los tipos de avión a la tarifa actual, así que si alguien pagó un avión y voló otro se compensa. No se controla el pago de los instructores ni de las personas de la lista «No controlar pagos de» de la pestaña Tarifas. Honorarios: horas del mes × (% de la tarifa del avión, o el valor fijo del instructor) + viático por cada día con vuelos en avión.';
   }
 
   function render(){
@@ -1476,7 +1483,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     }));
     state.mant = d.mant || [];
     state.aluIdx = null;
-    state.tar = d.tar || null; state.sim = d.sim || []; state.pagos = d.pagos || [];
+    state.tar = d.tar || null; state.sim = d.sim || []; state.pagos = d.pagos || []; state.ini = d.ini || [];
     onSheetData(rows, d.ts);
     onAgenda(d.agenda || []);
     render();
