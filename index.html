@@ -392,10 +392,14 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
       if (!date || h == null || h <= 0 || h > 24) continue;
       var ac = clean(r[13]).toUpperCase() || "Sin dato";
       var inst = clean(r[4]);
+      var pilot = clean(r[2]) || "Sin nombre";
       if (!inst || /^n\/?a$/i.test(inst) || inst === "-") inst = "Sin instructor";
+      // Alumno = instructor: es un vuelo propio (entrenamiento, traslado), no instrucción.
+      // No suma horas de instructor ni honorarios ni viáticos.
+      else if (nrm(inst) === nrm(pilot)) inst = "Sin instructor";
       out.push({
         date: date, hours: h, ac: ac,
-        pilot: clean(r[2]) || "Sin nombre",
+        pilot: pilot,
         purpose: clean(r[3]).toUpperCase() || "—",
         inst: inst,
         from: clean(r[5]).toUpperCase(), to: clean(r[6]).toUpperCase(),
@@ -409,7 +413,9 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
   // ---------- Filtros ----------
   function periodRange(p){
     var now = new Date();
-    if (p === "12m") return [new Date(now.getFullYear(), now.getMonth()-11, 1), null];
+    // Últimos 12 meses = 12 meses completos + el mes en curso. Así el promedio (que solo usa
+    // meses completos) se calcula sobre 12 meses y coincide con el «hoy» de la proyección.
+    if (p === "12m") return [new Date(now.getFullYear(), now.getMonth()-12, 1), null];
     if (p === "all") return [null, null];
     if (p === "custom"){
       var f = fromIso(state.from), t = fromIso(state.to);
@@ -463,6 +469,21 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
 
   // ---------- KPIs ----------
   function sum(rows){ return rows.reduce(function(s,r){ return s + r.hours; }, 0); }
+  // Definición única de «promedio mensual»: horas ÷ meses completos del período (sin el mes en curso),
+  // contando desde el primer vuelo del grupo de aviones. La usan el KPI, el gráfico y la flota.
+  function promMeses(rows, set){
+    if (!set) { var s0 = {}; rows.forEach(function(r){ s0[r.ac] = 1; }); set = Object.keys(s0); }
+    if (!set.length) return null;
+    var curK = monthKey(new Date()), first = null;
+    state.rows.forEach(function(r){ if (set.indexOf(r.ac) >= 0){ var k = monthKey(r.date); if (first === null || k < first) first = k; } });
+    if (first === null) return null;
+    var months = monthSpan(rows).filter(function(k){ return k < curK && k >= first; });
+    if (!months.length) return null;
+    var inM = {}; months.forEach(function(k){ inM[k] = 1; });
+    var tot = 0, n = 0;
+    rows.forEach(function(r){ if (set.indexOf(r.ac) >= 0 && inM[monthKey(r.date)]){ tot += r.hours; n++; } });
+    return { v: tot / months.length, n: months.length, vuelos: n, h: tot };
+  }
   function renderKpis(rows){
     var now = new Date(), curK = monthKey(now), prevK = monthKey(new Date(now.getFullYear(), now.getMonth()-1, 1));
     var base = state.rows.filter(function(r){
@@ -477,8 +498,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     var day = now.getDate();
     var prevToDate = sum(base.filter(function(r){ return monthKey(r.date) === prevK && r.date.getDate() <= day; }));
     var total = sum(rows), n = rows.length;
-    var months = {}; rows.forEach(function(r){ months[monthKey(r.date)] = 1; });
-    var nm = Object.keys(months).length || 1;
+    var pm = promMeses(rows);
     var delta = prevToDate ? (cur - prevToDate) / prevToDate : null;
     var dTxt = delta == null ? "Sin vuelos a esta altura del mes anterior"
       : '<span class="'+(delta>=0?'up':'down')+'">'+(delta>=0?'▲ ':'▼ ')+Math.abs(Math.round(delta*100))+'%</span> vs. '+fmtH(prevToDate)+' h al día '+day+' de '+MESES_L[(now.getMonth()+11)%12];
@@ -486,7 +506,9 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
       kpi("Horas en el período", fmtH(total), "h", fmtInt(n)+" vuelos registrados") +
       kpi("Horas de "+MESES_L[now.getMonth()], fmtH(cur), "h", dTxt + projLine(curK)) +
       kpi("Mes anterior", fmtH(prev), "h", "Total de "+MESES_L[(now.getMonth()+11)%12]) +
-      kpi("Promedio mensual", fmtH(total/nm), "h", fmtH1(n ? total/n : 0)+" h por vuelo en promedio");
+      kpi("Promedio mensual", pm ? fmtH(pm.v) : "—", pm ? "h" : "",
+        pm ? "Sobre "+pm.n+(pm.n === 1 ? " mes completo" : " meses completos")+" · "+fmtH1(pm.vuelos ? pm.h/pm.vuelos : 0)+" h por vuelo"
+           : "Sin meses completos en el período");
   }
   function projLine(curK){
     if (state.inst) return '<br><span class="sub">Proyección no disponible con filtro de instructor</span>';
@@ -541,18 +563,9 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     if (!ks.length || (!rows.length && !hasProj)){ $("chart").innerHTML = '<p class="sub">No hay vuelos con estos filtros.</p>'; $("month-table").innerHTML=""; return; }
     // Líneas de referencia: promedio mensual sobre meses completos del período (sin el mes en curso),
     // contando desde el primer vuelo de cada grupo — mismo criterio que la tarjeta de flota.
-    var curK0 = monthKey(new Date()), comp = ks.filter(function(k){ return k < curK0; });
-    function firstMonth(set){
-      var f = null; state.rows.forEach(function(r){ if (set.indexOf(r.ac) >= 0){ var k = monthKey(r.date); if (f === null || k < f) f = k; } });
-      return f;
-    }
     function groupAvg(set){
-      set = set.filter(function(a){ return acs.indexOf(a) >= 0; });
-      if (!set.length) return null;
-      var f = firstMonth(set), months = comp.filter(function(k){ return k >= f; });
-      if (!months.length) return null;
-      var tot = 0; months.forEach(function(k){ set.forEach(function(a){ tot += data[k][a] || 0; }); });
-      return { v: tot / months.length, n: months.length };
+      set = set.filter(function(a){ return rows.some(function(r){ return r.ac === a; }); });
+      return promMeses(rows, set);
     }
     var refs = [
       { name: "Prom. total", set: acs.slice(), stroke: "var(--fg)", dash: "", w: 1.75, op: 1 },
@@ -663,18 +676,15 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     var now = new Date(), curK = monthKey(now), acs = aircraftList();
     // Promedio mensual: solo meses completos del período (se excluye el mes en curso),
     // contados desde el primer vuelo del avión para no diluir a los que se sumaron después.
-    var complete = monthSpan(rows).filter(function(k){ return k < curK; });
     var cards = acs.map(function(a){
       var all = state.rows.filter(function(r){ return r.ac === a; });
       if (!all.length) return "";
       var mine = rows.filter(function(r){ return r.ac === a; });
       var per = sum(mine);
       var mes = sum(all.filter(function(r){ return monthKey(r.date) === curK; }));
-      var firstK = monthKey(all[0].date);
-      var months = complete.filter(function(k){ return k >= firstK; });
-      var inMonths = {}; months.forEach(function(k){ inMonths[k] = 1; });
-      var avgTxt = months.length
-        ? fmtH(sum(mine.filter(function(r){ return inMonths[monthKey(r.date)]; })) / months.length) + ' h/mes <span class="sub">(' + months.length + (months.length === 1 ? ' mes' : ' meses') + ')</span>'
+      var pa = promMeses(rows, [a]);
+      var avgTxt = pa
+        ? fmtH(pa.v) + ' h/mes <span class="sub">(' + pa.n + (pa.n === 1 ? ' mes' : ' meses') + ')</span>'
         : '— <span class="sub">(sin meses completos)</span>';
       var last = all[all.length-1].date;
       var days = Math.round((new Date(now.getFullYear(),now.getMonth(),now.getDate()) - last)/864e5);
@@ -755,17 +765,25 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     }
     var all = aircraftList();
     var groups = [["Total", all], ["C150 (IQB + FPJ)", ["IQB","FPJ"]], ["S091", ["S091"]]];
+    // Meses de la ventana desde el mes en curso: ahí solo cuenta lo agendado, así que la
+    // diferencia contra «hoy» no es una caída sino agenda sin cargar. En vez de un ▼ en rojo
+    // se muestra qué porcentaje del ritmo actual ya está cubierto por vuelos + turnos.
+    var fut = ks.filter(function(k){ return k >= curK; });
     var items = groups.map(function(g){
       var p = avg(g[1], ks, true), c = avg(g[1], ksNow, false);
       if (!p) return "";
-      var d = c ? p.v - c.v : null;
-      var dTxt = d == null ? "" : ' · <span class="'+(d>=0?'up':'down')+'">'+(d>=0?'▲ ':'▼ ')+fmtH(Math.abs(d))+' h</span> vs. hoy ('+fmtH(c.v)+')';
+      var dTxt = "";
+      if (c && c.v > 0){
+        dTxt = ' · <span class="sub">hoy '+fmtH(c.v)+' h/mes</span>';
+        var f = fut.length ? avg(g[1], fut, true) : null;
+        if (f) dTxt += '<br><span class="sub">Agenda: '+Math.round(f.v / c.v * 100)+'% del ritmo actual en los próximos '+f.n+(f.n === 1 ? ' mes' : ' meses')+'</span>';
+      }
       return '<div class="pa"><span class="v num">'+fmtH(p.v)+'<small>h/mes</small></span><span class="k">'+esc(g[0])+dTxt+'</span></div>';
     }).join("");
     if (!items){ el.hidden = true; return; }
     el.hidden = false;
     el.innerHTML = '<span class="pa-t">Promedio mensual proyectado · '+monthLabel(k0)+' → '+monthLabel(k1)+'</span>' + items +
-      '<span class="pa-n">12 meses: lo volado hasta hoy más lo agendado en Calendar hasta '+monthLabel(k1)+'. Los meses futuros solo cuentan los turnos ya cargados, así que va a subir a medida que se agende. «Hoy» = últimos 12 meses completos.</span>';
+      '<span class="pa-n">12 meses: lo volado hasta hoy más lo agendado en Calendar hasta '+monthLabel(k1)+'. Los meses futuros solo cuentan los turnos ya cargados, así que va a subir a medida que se agende. «Hoy» = promedio de los últimos 12 meses completos (el mismo del gráfico con «Últimos 12 meses»). «Agenda» = horas voladas + agendadas desde el mes en curso, como % de ese ritmo.</span>';
   }
 
   // ---------- Mantenimiento ----------
@@ -957,7 +975,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     var key = nameIndex(Object.keys(cfg.inst).map(function(k){ return cfg.inst[k].nombre; })
       .concat(state.rows.map(function(r){ return r.inst; })).concat((state.sim || []).map(function(s){ return s[3]; })));
     var instCfg = {}; Object.keys(cfg.inst).forEach(function(k){ instCfg[key(cfg.inst[k].nombre)] = cfg.inst[k]; });
-    var P = {};
+    var P = {}, sinTarifa = {};
     function get(n){
       var k = key(n); if (!k || /^(n a|na|sin instructor|no)$/.test(k)) return null;
       var p = P[k] || (P[k] = { k: k, nombre: (instCfg[k] && instCfg[k].nombre) || clean(n), cfg: instCfg[k] || null, h: {}, m: {}, hon: 0, dias: {}, vuelos: 0 });
@@ -965,7 +983,13 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     }
     state.rows.forEach(function(r){
       if (monthKey(r.date) !== mk) return;
-      var g = cfg.byMat[r.ac]; if (!g) return;
+      var g = cfg.byMat[r.ac];
+      if (!g){
+        // Matrícula sin fila en Tarifas: no se puede valuar, pero no se descarta en silencio.
+        var ki = key(r.inst);
+        if (ki && !/^(n a|na|sin instructor|no)$/.test(ki)){ var st = sinTarifa[r.ac] || (sinTarifa[r.ac] = { h: 0, vuelos: 0, inst: {} }); st.h += r.hours; st.vuelos++; st.inst[clean(r.inst)] = 1; }
+        return;
+      }
       var p = get(r.inst); if (!p) return;
       var rate = p.cfg && p.cfg.hAv ? p.cfg.hAv : g.tarifa * g.pct;
       p.h[g.nombre] = (p.h[g.nombre] || 0) + r.hours;
@@ -977,17 +1001,30 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
       var d = parseDate(s[0]); if (!d || monthKey(d) !== mk) return;
       var h = parseHours(s[4]); if (!(h > 0 && h <= 12)) return;
       if (!cfg.sim) return;
+      if (nrm(s[3]) && nrm(s[3]) === nrm(s[1])) return; // alumno = instructor: no es instrucción
       var p = get(s[3]); if (!p) return;
       var rate = p.cfg && p.cfg.hSim ? p.cfg.hSim : cfg.sim.tarifa * cfg.sim.pct;
       p.h[cfg.sim.nombre] = (p.h[cfg.sim.nombre] || 0) + h;
       p.m[cfg.sim.nombre] = (p.m[cfg.sim.nombre] || 0) + h * rate;
       p.hon += h * rate; p.vuelos++;
     });
-    return Object.keys(P).map(function(k){
+    var list = Object.keys(P).map(function(k){
       var p = P[k], dias = Object.keys(p.dias).length, cobra = !p.cfg || p.cfg.cobra;
       var viat = p.cfg ? dias * p.cfg.viat : 0;
       return { nombre: p.nombre, h: p.h, m: cobra ? p.m : {}, dias: dias, hon: cobra ? p.hon : 0, viat: cobra ? viat : 0, cobra: cobra, enTabla: !!p.cfg, vuelos: p.vuelos };
     }).sort(function(a,b){ return (b.hon + b.viat) - (a.hon + a.viat) || a.nombre.localeCompare(b.nombre); });
+    list.sinTarifa = sinTarifa;
+    return list;
+  }
+  // Aviso de vuelos con instructor en matrículas que no figuran en la pestaña Tarifas
+  function sinTarifaHtml(st){
+    var acs = Object.keys(st || {}); if (!acs.length) return "";
+    var det = acs.map(function(a){
+      var x = st[a];
+      return '<b class="num">'+esc(a)+'</b>: '+hrs1(x.h)+' h en '+x.vuelos+(x.vuelos === 1 ? ' vuelo' : ' vuelos')+' ('+esc(Object.keys(x.inst).join(", "))+')';
+    }).join(" · ");
+    return '<div class="notice" style="margin-bottom:12px"><b>Vuelos sin tarifa: no están en la previsión</b><span>'+det+
+      '. Agregá '+(acs.length === 1 ? 'la matrícula' : 'las matrículas')+' en la columna de matrículas del avión que corresponda en la pestaña «Tarifas».</span></div>';
   }
   function renderInstructores(cfg){
     // Liquidación por mes: por defecto el mes en curso; se pueden elegir los anteriores desde la fecha de inicio de Tarifas
@@ -1009,10 +1046,11 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
       k("Honorarios por horas", money(tot.hon), hrs1(tot.h) + " h instruidas") +
       k("Viáticos", money(tot.viat), "Por día de vuelo, según la pestaña Tarifas") +
       k("Instructores", fmtInt(list.filter(function(p){ return p.cobra; }).length), list.some(function(p){ return !p.cobra; }) ? fmtInt(list.filter(function(p){ return !p.cobra; }).length) + " con vuelos que no cobran" : "con vuelos en el mes");
-    if (!list.length){ $("c-inst").innerHTML = '<p class="sub">No hay vuelos con instructor en este mes.</p>'; return; }
+    var aviso = sinTarifaHtml(list.sinTarifa);
+    if (!list.length){ $("c-inst").innerHTML = aviso + '<p class="sub">No hay vuelos con instructor en este mes.</p>'; return; }
     var gUsa = grupos.filter(function(g){ return list.some(function(p){ return p.h[g.nombre]; }); }); if (gUsa.length) grupos = gUsa;
     function num0(v){ return (Math.round(v) || 0).toLocaleString("es-AR"); }
-    $("c-inst").innerHTML = '<table><thead><tr><th>Instructor</th>' + grupos.map(function(g){ return '<th class="r">'+esc(g.nombre)+'</th><th class="r">$</th>'; }).join("") +
+    $("c-inst").innerHTML = aviso + '<table><thead><tr><th>Instructor</th>' + grupos.map(function(g){ return '<th class="r">'+esc(g.nombre)+'</th><th class="r">$</th>'; }).join("") +
       '<th class="r">Días</th><th class="r">Honorarios $</th><th class="r">Viáticos $</th><th class="r">Total $</th></tr></thead><tbody>' +
       list.map(function(p){
         var note = !p.cobra ? ' <span class="tag">no cobra</span>' : !p.enTabla ? ' <span class="tag" title="No está en la pestaña Tarifas: se calcula al % de cada avión, sin viático">no está en Tarifas</span>' : '';
