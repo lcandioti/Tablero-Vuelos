@@ -281,7 +281,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
       <div class="alu-ctl"><label class="mfilter"><span class="flabel">Alumno</span><select class="sel" id="f-alu"><option value="">Elegí un alumno…</option></select></label>
         <button class="btn" id="alu-xls" type="button" disabled>Descargar Excel</button><button class="btn" id="alu-pdf" type="button" disabled>Descargar PDF</button></div>
     </div>
-    <p class="sub" style="margin:0">Todos los vuelos registrados del alumno, incluido el simulador, sin aplicar los filtros de arriba.</p>
+    <p class="sub" style="margin:0" id="alu-filtro"></p>
     <div id="alu-body"></div>
   </section>
 
@@ -1212,15 +1212,42 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
   }
   function fecha4(d){ return String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear(); }
   function ruta(f){ return f.from || f.to ? (f.from || "—") + " - " + (f.to || "—") : "—"; }
+  // Los vuelos del alumno respetan los filtros de arriba (período, avión e instructor)
+  function aluEnFiltro(f){
+    var rg = periodRange(state.period), acSel = Object.keys(state.ac).filter(function(k){ return state.ac[k]; });
+    if (rg[0] && f.date < rg[0]) return false;
+    if (rg[1] && f.date >= rg[1]) return false;
+    if (acSel.length && acSel.indexOf(f.ac) < 0) return false;
+    if (state.inst && f.inst !== state.inst) return false;
+    return true;
+  }
+  function aluVista(a){
+    var f = a.f.filter(aluEnFiltro);
+    return { k: a.k, nombre: a.nombre, var: a.var, f: f, h: f.reduce(function(t, x){ return t + x.hours; }, 0), total: a.f.length };
+  }
+  function filtroTexto(){
+    var p = state.period, t;
+    if (p === "12m") t = "últimos 12 meses";
+    else if (p === "all") t = "todo el historial";
+    else if (p === "custom"){ var rg = periodRange(p); t = (rg[0] ? "desde el " + fecha4(rg[0]) : "desde el inicio") + (rg[1] ? " hasta el " + fecha4(new Date(rg[1].getTime() - 864e5)) : " hasta hoy"); }
+    else t = "año " + p;
+    var acSel = Object.keys(state.ac).filter(function(k){ return state.ac[k]; });
+    if (acSel.length) t += " · " + acSel.join(", ");
+    if (state.inst) t += " · instructor " + state.inst;
+    return t;
+  }
   function renderAlumno(){
-    var ix = state.aluIdx || aluIndex(), A = ix.A;
-    var keys = Object.keys(A).sort(function(x, y){ return A[x].nombre.localeCompare(A[y].nombre, "es"); });
+    var ix = state.aluIdx || aluIndex(), A = ix.A, V = {};
+    Object.keys(A).forEach(function(k){ V[k] = aluVista(A[k]); });
+    var keys = Object.keys(A).filter(function(k){ return V[k].f.length || k === state.alu; }).sort(function(x, y){ return A[x].nombre.localeCompare(A[y].nombre, "es"); });
     if (state.alu && !A[state.alu]) state.alu = "";
     var sel = $("f-alu");
-    sel.innerHTML = '<option value="">Elegí un alumno…</option>' + keys.map(function(k){ return '<option value="'+esc(k)+'"'+(k === state.alu ? ' selected' : '')+'>'+esc(A[k].nombre)+' ('+fmtH1(A[k].h)+' h)</option>'; }).join("");
-    var a = A[state.alu];
-    $("alu-xls").disabled = $("alu-pdf").disabled = !a;
-    if (!a){ $("alu-body").innerHTML = '<p class="sub">Elegí un alumno en la lista, o tocá su nombre en «Alumnos y pilotos», para ver todos sus vuelos y descargarlos.</p>'; return; }
+    sel.innerHTML = '<option value="">Elegí un alumno…</option>' + keys.map(function(k){ return '<option value="'+esc(k)+'"'+(k === state.alu ? ' selected' : '')+'>'+esc(A[k].nombre)+' ('+fmtH1(V[k].h)+' h)</option>'; }).join("");
+    $("alu-filtro").textContent = "Vuelos del alumno, incluido el simulador, según el filtro de arriba: " + filtroTexto() + ".";
+    var a = V[state.alu];
+    $("alu-xls").disabled = $("alu-pdf").disabled = !(a && a.f.length);
+    if (!a){ $("alu-body").innerHTML = '<p class="sub">Elegí un alumno en la lista, o tocá su nombre en «Alumnos y pilotos», para ver sus vuelos y descargarlos.</p>'; return; }
+    if (!a.f.length){ $("alu-body").innerHTML = '<p class="sub">'+esc(a.nombre)+' no tiene vuelos con este filtro ('+esc(filtroTexto())+'). Tiene '+fmtInt(a.total)+' vuelos en total: cambiá el período arriba para verlos.</p>'; return; }
     var res = aluResumen(a), otros = Object.keys(a.var).filter(function(n){ return n !== a.nombre; });
     function k(t, v){ return '<div><span class="flabel">'+esc(t)+'</span><b class="num">'+v+'</b></div>'; }
     $("alu-body").innerHTML =
@@ -1228,6 +1255,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
         res.map(function(r){ return k(r[0], fmtH1(r[1]) + ' h'); }).join("") +
         k("Primer vuelo", fmtDate(a.f[0].date)) + k("Último vuelo", fmtDate(a.f[a.f.length - 1].date)) + '</div>' +
       (otros.length ? '<p class="sub" style="margin:0">También cargado como: '+esc(otros.join(", "))+'</p>' : '') +
+      (a.f.length < a.total ? '<p class="sub" style="margin:0">Se muestran '+fmtInt(a.f.length)+' de sus '+fmtInt(a.total)+' vuelos registrados.</p>' : '') +
       '<div class="tbl alu-tbl"><table><thead><tr><th>#</th><th>Fecha</th><th>Avión</th><th>Instructor</th><th>Finalidad</th><th>Ruta</th><th class="r">Horas</th><th class="r">Acumulado</th></tr></thead><tbody>' +
       (function(){ var acc = 0; return a.f.map(function(f, i){ acc += f.hours;
         return '<tr><td class="num sub">'+(i + 1)+'</td><td class="num">'+fmtDate(f.date)+'</td><td>'+(f.ac === "Simulador" ? 'Simulador' : '<span class="acdot" style="background:'+acColor(f.ac)+'"></span>'+esc(f.ac))+'</td><td>'+esc(f.inst)+'</td><td><span class="tag">'+esc(f.purpose)+'</span></td><td class="num">'+esc(ruta(f))+'</td><td class="r">'+fmtH1(f.hours)+'</td><td class="r sub">'+fmtH1(acc)+'</td></tr>'; }).join(""); })() +
@@ -1309,7 +1337,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
   function aluExcel(a){
     var hoy = new Date(), filas = [
       [{ v: "Génesis Aviación · Vuelos de " + a.nombre, s: 5 }],
-      ["Generado el " + fecha4(hoy) + " · " + a.f.length + " vuelos · " + fmtH1(a.h) + " h · del " + fecha4(a.f[0].date) + " al " + fecha4(a.f[a.f.length - 1].date)],
+      ["Filtro: " + filtroTexto() + " · generado el " + fecha4(hoy) + " · " + a.f.length + " vuelos · " + fmtH1(a.h) + " h · del " + fecha4(a.f[0].date) + " al " + fecha4(a.f[a.f.length - 1].date)],
       [],
       ["Fecha", "Avión", "Instructor", "Finalidad", "Origen", "Destino", "Horas"].map(function(t){ return { v: t, s: 6 }; })
     ];
@@ -1377,7 +1405,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
       if (primera){
         c += txt(M, y - 4, "Génesis Aviación", 10, true, "0.769 0.071 0.188"); y -= 26;
         c += txt(M, y, "Vuelos de " + a.nombre, 17, true); y -= 18;
-        c += txt(M, y, "Generado el " + fecha4(hoy) + "  ·  del " + fecha4(a.f[0].date) + " al " + fecha4(a.f[a.f.length - 1].date), 9, false, "0.35 0.35 0.35"); y -= 22;
+        c += txt(M, y, "Filtro: " + filtroTexto() + "  ·  generado el " + fecha4(hoy) + "  ·  del " + fecha4(a.f[0].date) + " al " + fecha4(a.f[a.f.length - 1].date), 9, false, "0.35 0.35 0.35"); y -= 22;
         var res = [["Vuelos", fmtInt(a.f.length)], ["Horas totales", fmtH1(a.h)]].concat(aluResumen(a).map(function(r){ return [r[0], fmtH1(r[1]) + " h"]; })), x = M;
         res.forEach(function(r){ c += txt(x, y, r[0].toUpperCase(), 7, false, "0.45 0.45 0.45") + txt(x, y - 15, r[1], 13, true); x += Math.max(70, anchoTxt(r[0].toUpperCase(), 7) + 18, anchoTxt(r[1], 13, true) + 18); });
         y -= 34; c += linea(M, y + 8, W - M, y + 8, "0.6"); y -= 8;
@@ -1403,8 +1431,8 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     return pdfDoc(paginas);
   }
   $("f-alu").addEventListener("change", function(e){ state.alu = e.target.value; renderAlumno(); });
-  $("alu-xls").addEventListener("click", function(){ var a = state.aluIdx && state.aluIdx.A[state.alu]; if (a) descargar(aluExcel(a), aluArchivo(a, "xlsx"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); });
-  $("alu-pdf").addEventListener("click", function(){ var a = state.aluIdx && state.aluIdx.A[state.alu]; if (a) descargar(aluPdf(a), aluArchivo(a, "pdf"), "application/pdf"); });
+  $("alu-xls").addEventListener("click", function(){ var a = state.aluIdx && state.aluIdx.A[state.alu] && aluVista(state.aluIdx.A[state.alu]); if (a && a.f.length) descargar(aluExcel(a), aluArchivo(a, "xlsx"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); });
+  $("alu-pdf").addEventListener("click", function(){ var a = state.aluIdx && state.aluIdx.A[state.alu] && aluVista(state.aluIdx.A[state.alu]); if (a && a.f.length) descargar(aluPdf(a), aluArchivo(a, "pdf"), "application/pdf"); });
   document.addEventListener("click", function(e){
     var r = e.target.closest && e.target.closest("#students .hrow[data-n]");
     if (!r) return;
