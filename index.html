@@ -132,7 +132,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 .notice{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:6px}
 .notice b{font-family:var(--f-display);font-size:1.15rem;font-weight:600}
 .skel{height:14px;border-radius:3px;background:var(--grid)}
-.tip{position:fixed;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:var(--r);padding:8px 10px;font-size:.8rem;line-height:1.35;z-index:10;max-width:220px;box-shadow:0 4px 16px rgba(0,0,0,.18)}
+.tip{position:fixed;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:var(--r);padding:8px 10px;font-size:.8rem;line-height:1.35;z-index:40;max-width:220px;box-shadow:0 4px 16px rgba(0,0,0,.18)}
 .tip .t{font-family:var(--f-mono);font-size:.72rem;opacity:.8;margin-bottom:2px}
 .tip .row{display:flex;justify-content:space-between;gap:12px;font-variant-numeric:tabular-nums}
 footer{color:var(--muted);font-size:.78rem}
@@ -192,11 +192,17 @@ tr.tot td{border-top:1px solid var(--axis);border-bottom:none}
 .kpi .v.down{color:var(--down)}
 h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-transform:uppercase;letter-spacing:.06em;margin:6px 0 0}
 @media (prefers-reduced-motion:no-preference){.seg{transition:opacity .15s}}
+
+/* Encabezado fijo: título, estado, «Actualizar» y solapas quedan arriba al bajar */
+.stick{position:sticky;top:0;z-index:30;background:var(--bg);display:flex;flex-direction:column;gap:20px;padding-top:12px;margin-top:-12px;box-shadow:0 8px 8px -8px rgba(0,0,0,.18)}
+.stick .tabs{margin-top:-8px;background:var(--bg)}
+@media (max-width:520px){.stick{gap:12px}.stick h1{font-size:1.5rem}.stick .sub{font-size:.75rem}}
 </style>
 </head>
 <body>
 
 <div class="wrap">
+  <div class="stick">
   <header class="top">
     <div class="mark">
       <div>
@@ -215,6 +221,7 @@ h3.csub{font-family:var(--f-display);font-weight:600;font-size:1.05rem;text-tran
     <button class="tab" role="tab" type="button" data-view="mant" aria-selected="false" aria-controls="view-mant">Mantenimiento<span id="mant-badge"></span></button>
     <button class="tab" role="tab" type="button" data-view="ctrl" aria-selected="false" aria-controls="view-ctrl">Controles</button>
   </nav>
+  </div>
 
   <div id="notice" hidden></div>
 
